@@ -57,7 +57,7 @@ I will list each class and the functions within each class.
     input: params, func(keras model building function), task, X(input array), y(output array), X_val(default=None), y_val(default=None), batch_size(default=64),                     epochs(default=50) 
     output: tuned keras gridsearch, use .best_estimator at the end to get the model or .best_params to get it's parameter combination
   * CollectPerformance
-    input: params, func(must be a potosnail build function), X, y, epochs(default=50), batch_size(default=64), patience(how many epochs a model can stagnate before fitting           stops, default=5), regression(default=False)
+    input: params, func(must be a keras model building function that takes in 10 arguments), X, y, epochs(default=50), batch_size(default=64), patience(how many epochs a model can stagnate before fitting stops, default=5), regression(default=False)
     output: a dataframe showing the performance for all hyperparameter combinations
   * ClassifyImage
    input: model_dir(directory to saved .h5 file), image(image must be a tensor), classes(list of strings)
