@@ -9,7 +9,14 @@ pip install Potosnail==0.0.5
 
 import potosnail
 
+# Tutorials
+Check out the notebooks in the tutorials folder to see some implementation.
+
 # Code Structure
+
+## Why do these model building functions take in 10 arguments?
+
+
 I will list each class and the functions within each class.
 
 1. MachineLearning
