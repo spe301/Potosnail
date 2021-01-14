@@ -15,7 +15,7 @@ Check out the notebooks in the tutorials folder to see some implementation.
 # Code Structure
 
 ## Why do these model building functions take in 10 arguments?
-
+<img src="Images/4tqs0v.jpg/">
 
 I will list each class and the functions within each class.
 
