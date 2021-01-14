@@ -14,13 +14,11 @@ import potosnail
 # Tutorials
 Check out the notebooks in the tutorials folder to see some implementation.
 
-# Code Structure
-
 ## Why do these model building functions take in 10 arguments?
 <img src="Images/4tqs0v.jpg/">
 If you use DeepTabularRegression, DeepTabularClassification, RNN, or CNN from DeepLearning you'll notice that these funtions require 10 arguments, this is so that these functions work well with the CollectPerformance function. if you don't like this you can use FastNN (for the DeepTabulars), FastRNN, and FastCNN instead.
 
-## now to explain all the functions
+# Code Structure
 I will list each class and the functions within each class.
 
 1. MachineLearning
