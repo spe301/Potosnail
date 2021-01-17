@@ -13,8 +13,8 @@ pip install Potosnail==0.0.5
 
 import potosnail
 
-# Tutorials
-Check out the notebooks in the tutorials folder to see some implementation.
+# Tutorials and Case Studies
+Check out the notebooks in the tutorials folder to see some implementation. If you want to see more real-world use cases for potosnail, chech out the Case_Studies folder
 
 ## Why do these model building functions take in 10 arguments?
 <img src="Images/4tqs0v.jpg/">
