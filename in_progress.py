@@ -732,6 +732,19 @@ class Algorithms:
     def ReduceTo(self, X):
     	return int(len(list(X.columns))/5)
 
+    def ToTry(self, X):
+    	n_features = len(list(X.columns))
+    	if n_features >= 15:
+    		k = int(round(n_features/3))
+    		step = int(round(k/3))
+    		k_features = [k]
+    		for i in range(3):
+    			k += step
+    			k_features.append(k)
+    	else:
+    		k_features = [n_features-1, n_features-2, n_features-3, n_features-4]
+    	return k_features
+
 
 class Wrappers: 
 
@@ -840,6 +853,26 @@ class Wrappers:
 		scores = ev.ACE(clf, 'accuracy', Xval, yval)
 		return scores, clf, X2, y2
 
+	def FeatureEngineering(self, X, y, Xval, yval, model, task, metric, quiet=False):
+		al = Algorithms()
+		dh = DataHelper()
+		ev = Evaluater()
+		try_list = al.ToTry(X)
+		results = {}
+		for i in range(len(try_list)):
+			X2 = dh.MakeNewDF(X, y, try_list[i])
+			Xv2 = Xval[list(X2.columns)]
+			model.fit(X2, y)
+			if task == 'classification': #add in regression later on
+				score1, score2 = ev.ACE(model, metric, Xv2, yval)
+				s1 = 'recall'
+				s2 = 'auc'
+			if quiet == False:
+				print('with {} features we got a {} of {} and a {} of {}'.format(try_list[i], s1, score1, s2, score2))
+			final_score = (score1+score2)/2
+			results[final_score] = try_list[i]
+		return results[max(results)] #change this to return entire df rather than n features
+
 	def ClfLoop(self, vanilla, grid, X, Xval, y, yval):
 		bm = None
 		al = Algorithms()
@@ -875,13 +908,24 @@ class Wrappers:
 			if scores3[1] >= 0.95:
 				bm = clf3
 		if metric == 'recall':
-			bm = wr.SmoteStack(X3, y, Xv3, yval, vanilla) #this function is being used incorrectly
+			scores4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla)
+			if scores4[0] >= 0.95:
+				if scores4[0] >= 0.95:
+					bm = clf4
+		else:
+			X4 = X3
+			y4 = y
+
 		return bm
 		
 
 vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv')
 #vanilla, grid, X, Xval, y, yval = Wrappers().Vanilla(vt, 'churn', 'classification')
 #print(Wrappers().ClfLoop(vanilla, grid, X, Xval, y, yval))
-X = vt.drop(['churn'], axis='columns')
-#y = vt['churn']
-#clf = SVC()
+train, test = DataHelper().HoldOut(vt)
+X = train.drop(['churn'], axis='columns')
+Xval = test.drop(['churn'], axis='columns')
+y = train['churn']
+yval = test['churn']
+clf = SVC()
+print(Wrappers().FeatureEngineering(X, y, Xval, yval, clf, 'classification', 'recall', quiet=True))
