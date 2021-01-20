@@ -65,7 +65,7 @@ class MachineLearning:
             results.columns = ['Model', 'train_acc', 'test_acc']
         return results
     
-    def Optimize(self, model, parameters, X, y, metric='accuracy'):
+    def Optimize(self, model, parameters, X, y, metric='accuracy'): #make verbose a kwarg
         '''facilitates a gridsearch on any sklearn model'''
         try:
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
@@ -112,24 +112,26 @@ class MachineLearning:
         return results
 
     def AMC(self, X, y, task):
+    	'''Automated Model Comparasion'''
     	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
-        n = len(np.unique(y))
-        if task == 'classification':
-            if n == 2:
-                methods = [KNeighborsClassifier(), GaussianNB(), DecisionTreeClassifier(), RandomForestClassifier(),
+    	n = len(np.unique(y))
+    	if task == 'classification':
+    		if n == 2:
+    			methods = [KNeighborsClassifier(), GaussianNB(), DecisionTreeClassifier(), RandomForestClassifier(),
                            AdaBoostClassifier(), GradientBoostingClassifier(), XGBClassifier(), LogisticRegression(),
                            SVC()]
-            else:
-                methods = [KNeighborsClassifier(), DecisionTreeClassifier(), RandomForestClassifier(),
+    		else:
+    			methods = [KNeighborsClassifier(), DecisionTreeClassifier(), RandomForestClassifier(),
                            AdaBoostClassifier(), GradientBoostingClassifier(), XGBClassifier(), SVC()]
-        if task == 'regression':
-            methods = [LinearRegression(), KNeighborsRegressor(), DecisionTreeRegressor(), RandomForestRegressor(),
+    	if task == 'regression':
+    		methods = [LinearRegression(), KNeighborsRegressor(), DecisionTreeRegressor(), RandomForestRegressor(),
                        AdaBoostRegressor(), GradientBoostingRegressor(), XGBRegressor(), SVR()]
-        results = {}
-        for i in range(len(methods)):
-        	model = methods[i].fit(X_train, y_train)
-        	test_acc = model.score(X_test, y_test) #finnish dictionary
-    	return None
+    	results = {}
+    	for i in range(len(methods)):
+    		model = methods[i].fit(X_train, y_train)
+    		test_acc = model.score(X_test, y_test)
+    		results[test_acc] = methods[i]
+    	return results[max(results)]
 
 
 class DeepLearning:
@@ -677,6 +679,7 @@ class Evaluater:
       return auc(fpr, tpr)
 
     def ACE(self, fitted_model, metric, Xval, yval):
+    	'''Automated Classifier Evaluation'''
     	ev = Evaluater()
     	pred = fitted_model.predict(Xval)
     	cm = confusion_matrix(yval, pred)
@@ -727,14 +730,14 @@ class Algorithms:
     		tests.append(i*step)
     	return tests
 
-    def GetMetric(self, y, positive):
+    def GetMetric(self, y, fn):
     	'''determines if the metric should be accuracy or recall'''
     	total = len(y)
     	sizes = list(y.value_counts())
     	if max(sizes) > total*0.55:
-    		if positive == False:
+    		if fn == False:
     			metric = 'recall'
-    		if positive == True:
+    		if fn == True:
     			metric = 'precision'
     	else:
     		metric = 'accuracy'
@@ -755,9 +758,11 @@ class Algorithms:
     			return 'minmax'
 
     def ReduceTo(self, X):
+    	'''divides a n by 5 and converts it to an int'''
     	return int(len(list(X.columns))/5)
 
     def ToTry(self, X):
+    	'''returns a list of k features to select from'''
     	n_features = len(list(X.columns))
     	if n_features >= 15:
     		k = int(round(n_features/3))
@@ -783,103 +788,85 @@ class Wrappers:
 		Xval = test.drop([target_str], axis='columns')
 		y = train[target_str]
 		yval = test[target_str]
-		baseline = ml.CompareModels(X, y, task)
-		print(baseline)
-		best = str(dict(baseline.loc[baseline['test_acc'] == max(baseline['test_acc'])])['Model'])[5:8]
-		vanilla = None
+		vanilla = ml.AMC(X, y, task)
 		grid = None
-		if best == 'Lin':
-			vanilla = LinearRegression()
+		if vanilla == LinearRegression():
 			grid = {'fit_intercept': [True, False]}
-		if best == 'NB ':
-			vanilla = GaussianNB()
+		if vanilla == GaussianNB():
 			grid = {'var_smoothing': [1e-13, 1e-11, 1e-9, 1e-7, 1e-5]}
-		if best == 'Log':
-			vanilla == LogisticRegression()
+		if vanilla == LogisticRegression():
 			grid = {'penalty': ['l1', 'l2', None], 'C': [0.1, 0.5, 1, 2, 10], 
 			'fit_intercept': [True, False]}
-		if best == 'KNN':
-			if task == 'regression':
-				vanilla = KNeighborsRegressor()
-				nearest = al.Neighbors(X, y, 'regression')
-				grid = {'n_neighbors': nearest}
-			if task == 'classification':
-				vanilla = KNeighborsClassifier()
-				neighbors1, neighbors2, neighbors3 = al.Neighbors(X, y, 'classification')
-				grid = {'n_neighbors': [5, neighbors1, neighbors2, neighbors3], 
-				'weights': ['uniform', 'distance'], 'p': [1, 2]}
-		if best == 'DT ':
-			if task == 'regression':
-				vanilla = DecisionTreeRegressor()
-				grid = {'max_depth': [2, 5, 8, None]} #add in other params later
-			if task == 'classification':
-				vanilla = DecisionTreeClassifier()
-				grid = {'criterion': ['gini', 'entropy'], 'splitter': ['best', 'random'], 
-				'max_depth': [2, 5, 8, None]}
-		if best == 'RF ':
+		if vanilla == KNeighborsRegressor():
+			nearest = al.Neighbors(X, y, 'regression')
+			grid = {'n_neighbors': nearest}
+		if vanilla == KNeighborsClassifier():
+			neighbors1, neighbors2, neighbors3 = al.Neighbors(X, y, 'classification')
+			grid = {'n_neighbors': [5, neighbors1, neighbors2, neighbors3], 
+			'weights': ['uniform', 'distance'], 'p': [1, 2]}
+		if vanilla == DecisionTreeRegressor():
+			grid = {'max_depth': [2, 5, 8, None]} #add in other params later
+		if vanilla == DecisionTreeClassifier():
+			grid = {'criterion': ['gini', 'entropy'], 'splitter': ['best', 'random'], 'max_depth': [2, 5, 8, None]}
+		if vanilla == RandomForestRegressor():
 			estimators = al.Estimators(X, 100)
-			if task == 'regression':
-				vanilla = RandomForestRegressor()
-				grid = {'n_estimators': estimators, 'criterion': ['mse', 'mae'], 
-				'max_depth': [2, 5, 8, None]}
-			if task == 'classification':
-				vanilla = RandomForestClassifier()
-				grid = {'n_estimators': estimators, 'criterion': ['gini', 'entropy'], 
-				'max_depth': [2, 5, 8, None]}
-		if best == 'AB ':
-			estimators = al.Estimators(X, 50)
-			if task == 'regression':
-				vanilla = AdaBoostRegressor()
-				grid = {'n_estimators': estimators, 'learning_rate': [0.1, 0.5, 1], 
-				'loss': ['linear', 'square', 'exponential']}
-			if task == 'classification':
-				vanilla = AdaBoostClassifier()
-				grid = {'n_estimators': estimators, 'learning_rate': [0.1, 0.5, 1], 
-				'algorithm': ['SAMME', 'SAMME.R']}
-		if best == 'GB ':
-			estimators = al.Estimators(X, 50)
-			if task == 'regression':
-				vanilla = GradientBoostingRegressor()
-				grid = {'learning_rate': [0.1, 0.5, 1], 'n_estimators': estimators, 
-				'criterion': ['friedman_mse', 'mse', 'mae']}
-			if task == 'classification':
-				vanilla = GradientBoostingClassifier()
-				grid = {'learning_rate': [0.1, 0.5, 1], 'n_estimators': estimators, 
-				'criterion': ['friedman_mse', 'mse', 'mae']}
-		if best == 'XGB':
+			grid = {'n_estimators': estimators, 'criterion': ['mse', 'mae'], 
+			'max_depth': [2, 5, 8, None]}
+		if vanilla == RandomForestClassifier():
 			estimators = al.Estimators(X, 100)
-			if task == 'regression':
-				vanilla = XGBRegressor()
-				grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
-				'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
-				'n_estimators': estimators}
-			if task == 'classification':
-				vanilla = XGBClassifier()
-				grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
-				'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
-				'n_estimators': estimators}
-		if best == 'SVM ':
-			if task == 'regression':
-				vanilla = SVR()
-				grid = {'kernel': ['linear', 'rbf'], 'gamma': ['scale', 'auto'], 
-				'C': [0.1, 1, 10]}
-			if task == 'classification':
-				vanilla = SVC()
-				grid = {'kernel': ['linear', 'rbf'], 'gamma': ['scale', 'auto'], 
-				'C': [0.1, 1, 10]}
+			grid = {'n_estimators': estimators, 'criterion': ['gini', 'entropy'], 
+			'max_depth': [2, 5, 8, None]}
+		if vanilla == AdaBoostRegressor():
+			estimators = al.Estimators(X, 50)
+			grid = {'n_estimators': estimators, 'learning_rate': [0.1, 0.5, 1], 
+			'loss': ['linear', 'square', 'exponential']}
+		if vanilla == AdaBoostClassifier():
+			estimators = al.Estimators(X, 50)
+			grid = {'n_estimators': estimators, 'learning_rate': [0.1, 0.5, 1], 'algorithm': ['SAMME', 'SAMME.R']}
+		if vanilla == GradientBoostingRegressor():
+			estimators = al.Estimators(X, 50)
+			grid = {'learning_rate': [0.1, 0.5, 1], 'n_estimators': estimators, 
+			'criterion': ['friedman_mse', 'mse', 'mae']}
+		if vanilla == GradientBoostingClassifier():
+			estimators = al.Estimators(X, 50)
+			grid = {'learning_rate': [0.1, 0.5, 1], 'n_estimators': estimators, 
+			'criterion': ['friedman_mse', 'mse', 'mae']}
+		if vanilla == XGBRegressor():
+			estimators = al.Estimators(X, 100)
+			grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
+			'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
+			'n_estimators': estimators}
+		if vanilla == XGBClassifier():
+			estimators = al.Estimators(X, 100)
+			grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
+			'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
+			'n_estimators': estimators}
+		if vanilla == SVR():
+			grid = {'kernel': ['linear', 'rbf'], 'gamma': ['scale', 'auto'], 
+			'C': [0.1, 1, 10]}
+		if vanilla == SVC():
+			grid = {'kernel': ['linear', 'rbf'], 'gamma': ['scale', 'auto'], 
+			'C': [0.1, 1, 10]}
+		else:
+			estimators = al.Estimators(X, 100)
+			grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
+			'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
+			'n_estimators': estimators}
 		return vanilla, grid, X, Xval, y, yval
 
-	def SmoteStack(self, X, y, Xval, yval, model, parameters):
+	def SmoteStack(self, X, y, Xval, yval, model, parameters, metric):
+		'''Smotes a dataset and evaluates model on it'''
 		dh = DataHelper()
 		ml = MachineLearning()
 		ev = Evaluater()
 		X2, y2 = dh.SmoteIt(X, y)
 		clf = ml.Optimize(model, parameters, X2, y2)
 		clf.fit(X2, y2)
-		scores = ev.ACE(clf, 'accuracy', Xval, yval)
+		scores = ev.ACE(clf, metric, Xval, yval)
 		return scores, clf, X2, y2
 
 	def FeatureEngineering(self, X, y, Xval, yval, model, task, metric, quiet=False):
+		'''experiments with different k features'''
 		al = Algorithms()
 		dh = DataHelper()
 		ev = Evaluater()
@@ -902,18 +889,19 @@ class Wrappers:
 		Xv3 = Xval[list(X3.columns)]
 		return X3, Xv3
 
-	def ClfLoop(self, vanilla, grid, X, Xval, y, yval):
+	def ClfLoop(self, vanilla, grid, X, Xval, y, yval, fn):
+		'''finds the best classifier'''
 		al = Algorithms()
 		ev = Evaluater()
 		ml = MachineLearning()
 		dh = DataHelper()
 		wr = Wrappers()
 		results = {}
-		metric = al.GetMetric(y, False)
+		metric = al.GetMetric(y, fn)
 		clf1 = vanilla
 		clf1.fit(X, y)
 		scores1 = ev.ACE(clf1, metric, Xval, yval) 
-		results[(scores1[0] + scores1[1])/2] = clf1
+		results[(scores1[0] + scores1[1])/2] = clf1 #[clf1, X]
 		clf2 = ml.Optimize(vanilla, grid, X, y, metric=metric)
 		clf2.fit(X, y)
 		scores2 = ev.ACE(clf2, metric, Xval, yval) 
@@ -925,13 +913,15 @@ class Wrappers:
 			Xv3 = dh.ScaleData(scaler, Xval, dim=dim)
 		else:
 			X3 = dh.ScaleData(scaler, X)
+			X3.columns = list(X.columns)
 			Xv3 = dh.ScaleData(scaler, Xval)
+			Xv3.columns = list(X.columns)
 		clf3 = ml.Optimize(vanilla, grid, X3, y, metric=metric)
 		scores3 = ev.ACE(clf3, metric, Xv3, yval) 
 		results[(scores3[0] + scores3[1])/2] = clf3
 		if metric != 'accuracy':
 			print('Smoting!!')
-			scores4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla, grid)
+			scores4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla, grid, metric)
 		else:
 			X4 = X3
 			y4 = y
@@ -944,13 +934,11 @@ class Wrappers:
 		scores5 = ev.ACE(clf5, metric, Xv5, yval)
 		results[(scores5[0] + scores5[1])/2] = clf5
 		return results[max(results)]
+
+	def ClfOn(self):
+		return None
 		
 
 vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv')
-#vanilla, grid, X, Xval, y, yval = Wrappers().Vanilla(vt, 'churn', 'classification')
-#print(Wrappers().ClfLoop(vanilla, grid, X, Xval, y, yval))
-#train, test = DataHelper().HoldOut(vt)
-X = train.drop(['churn'], axis='columns')
-#Xval = test.drop(['churn'], axis='columns')
-y = train['churn']
-#yval = test['churn']
+vanilla, grid, X, Xval, y, yval = Wrappers().Vanilla(vt, 'churn', 'classification')
+print(Wrappers().ClfLoop(vanilla, grid, X, Xval, y, yval, False))
