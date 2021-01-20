@@ -111,6 +111,26 @@ class MachineLearning:
         plt.show()
         return results
 
+    def AMC(self, X, y, task):
+    	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
+        n = len(np.unique(y))
+        if task == 'classification':
+            if n == 2:
+                methods = [KNeighborsClassifier(), GaussianNB(), DecisionTreeClassifier(), RandomForestClassifier(),
+                           AdaBoostClassifier(), GradientBoostingClassifier(), XGBClassifier(), LogisticRegression(),
+                           SVC()]
+            else:
+                methods = [KNeighborsClassifier(), DecisionTreeClassifier(), RandomForestClassifier(),
+                           AdaBoostClassifier(), GradientBoostingClassifier(), XGBClassifier(), SVC()]
+        if task == 'regression':
+            methods = [LinearRegression(), KNeighborsRegressor(), DecisionTreeRegressor(), RandomForestRegressor(),
+                       AdaBoostRegressor(), GradientBoostingRegressor(), XGBRegressor(), SVR()]
+        results = {}
+        for i in range(len(methods)):
+        	model = methods[i].fit(X_train, y_train)
+        	test_acc = model.score(X_test, y_test) #finnish dictionary
+    	return None
+
 
 class DeepLearning:
     
@@ -658,12 +678,14 @@ class Evaluater:
 
     def ACE(self, fitted_model, metric, Xval, yval):
     	ev = Evaluater()
+    	pred = fitted_model.predict(Xval)
+    	cm = confusion_matrix(yval, pred)
     	if metric == 'accuracy':
     		score1 = fitted_model.score(Xval, yval)
     	if metric == 'recall':
-    		pred = fitted_model.predict(Xval)
-    		cm = confusion_matrix(yval, pred)
     		score1 = cm[1][1] / (cm[1][0] + cm[1][1])
+    	if metric == 'precision':
+    		score1 = cm[0][0] / (cm[0][0] + cm[0][1])
     	score2 = ev.AUC(fitted_model, Xval, yval)
     	return score1, score2
 
@@ -705,12 +727,15 @@ class Algorithms:
     		tests.append(i*step)
     	return tests
 
-    def GetMetric(self, y):
+    def GetMetric(self, y, positive):
     	'''determines if the metric should be accuracy or recall'''
     	total = len(y)
     	sizes = list(y.value_counts())
     	if max(sizes) > total*0.55:
-    		metric = 'recall'
+    		if positive == False:
+    			metric = 'recall'
+    		if positive == True:
+    			metric = 'precision'
     	else:
     		metric = 'accuracy'
     	return metric
@@ -759,6 +784,7 @@ class Wrappers:
 		y = train[target_str]
 		yval = test[target_str]
 		baseline = ml.CompareModels(X, y, task)
+		print(baseline)
 		best = str(dict(baseline.loc[baseline['test_acc'] == max(baseline['test_acc'])])['Model'])[5:8]
 		vanilla = None
 		grid = None
@@ -843,7 +869,7 @@ class Wrappers:
 				'C': [0.1, 1, 10]}
 		return vanilla, grid, X, Xval, y, yval
 
-	def SmoteStack(self, X, y, Xval, yval, model):
+	def SmoteStack(self, X, y, Xval, yval, model, parameters):
 		dh = DataHelper()
 		ml = MachineLearning()
 		ev = Evaluater()
@@ -865,34 +891,33 @@ class Wrappers:
 			model.fit(X2, y)
 			if task == 'classification': #add in regression later on
 				score1, score2 = ev.ACE(model, metric, Xv2, yval)
-				s1 = 'recall'
+				s1 = metric
 				s2 = 'auc'
 			if quiet == False:
 				print('with {} features we got a {} of {} and a {} of {}'.format(try_list[i], s1, score1, s2, score2))
 			final_score = (score1+score2)/2
 			results[final_score] = try_list[i]
-		return results[max(results)] #change this to return entire df rather than n features
+		final = results[max(results)]
+		X3 = dh.MakeNewDF(X, y, final)
+		Xv3 = Xval[list(X3.columns)]
+		return X3, Xv3
 
 	def ClfLoop(self, vanilla, grid, X, Xval, y, yval):
-		bm = None
 		al = Algorithms()
 		ev = Evaluater()
 		ml = MachineLearning()
 		dh = DataHelper()
 		wr = Wrappers()
-		metric = al.GetMetric(y)
+		results = {}
+		metric = al.GetMetric(y, False)
 		clf1 = vanilla
 		clf1.fit(X, y)
-		scores1 = ev.ACE(clf1, metric, Xval, yval) #be sure to include a way to store results
-		if scores1[0] >= 0.95:
-			if scores1[1] >= 0.95:
-				bm = clf1
+		scores1 = ev.ACE(clf1, metric, Xval, yval) 
+		results[(scores1[0] + scores1[1])/2] = clf1
 		clf2 = ml.Optimize(vanilla, grid, X, y, metric=metric)
 		clf2.fit(X, y)
-		scores2 = ev.ACE(clf2, metric, Xval, yval) #be sure to include a way to store results
-		if scores2[0] >= 0.95:
-			if scores2[1] >= 0.95:
-				bm = clf2
+		scores2 = ev.ACE(clf2, metric, Xval, yval) 
+		results[(scores2[0] + scores2[1])/2] = clf2
 		scaler = al.PickScaler(X, y, clf2)
 		if scaler == 'pca':
 			dim = al.ReduceTo(X)
@@ -902,30 +927,30 @@ class Wrappers:
 			X3 = dh.ScaleData(scaler, X)
 			Xv3 = dh.ScaleData(scaler, Xval)
 		clf3 = ml.Optimize(vanilla, grid, X3, y, metric=metric)
-		clf3.fit(X3, y)
-		scores3 = ev.ACE(clf3, metric, Xv3, yval) #be sure to include a way to store results
-		if scores3[0] >= 0.95:
-			if scores3[1] >= 0.95:
-				bm = clf3
-		if metric == 'recall':
-			scores4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla)
-			if scores4[0] >= 0.95:
-				if scores4[0] >= 0.95:
-					bm = clf4
+		scores3 = ev.ACE(clf3, metric, Xv3, yval) 
+		results[(scores3[0] + scores3[1])/2] = clf3
+		if metric != 'accuracy':
+			print('Smoting!!')
+			scores4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla, grid)
 		else:
 			X4 = X3
 			y4 = y
-
-		return bm
+			scores4 = scores3
+			clf4 = clf3
+		results[(scores4[0] + scores4[1])/2] = clf4
+		X5, Xv5 = wr.FeatureEngineering(X4, y4, Xv3, yval, clf4, 'classification', metric, quiet=True)
+		clf5 = ml.Optimize(vanilla, grid, X5, y4)
+		clf5.fit(X5, y4)
+		scores5 = ev.ACE(clf5, metric, Xv5, yval)
+		results[(scores5[0] + scores5[1])/2] = clf5
+		return results[max(results)]
 		
 
 vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv')
 #vanilla, grid, X, Xval, y, yval = Wrappers().Vanilla(vt, 'churn', 'classification')
 #print(Wrappers().ClfLoop(vanilla, grid, X, Xval, y, yval))
-train, test = DataHelper().HoldOut(vt)
+#train, test = DataHelper().HoldOut(vt)
 X = train.drop(['churn'], axis='columns')
-Xval = test.drop(['churn'], axis='columns')
+#Xval = test.drop(['churn'], axis='columns')
 y = train['churn']
-yval = test['churn']
-clf = SVC()
-print(Wrappers().FeatureEngineering(X, y, Xval, yval, clf, 'classification', 'recall', quiet=True))
+#yval = test['churn']
