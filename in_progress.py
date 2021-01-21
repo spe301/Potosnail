@@ -112,26 +112,26 @@ class MachineLearning:
         return results
 
     def AMC(self, X, y, task):
-    	'''Automated Model Comparasion'''
-    	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
-    	n = len(np.unique(y))
-    	if task == 'classification':
-    		if n == 2:
-    			methods = [KNeighborsClassifier(), GaussianNB(), DecisionTreeClassifier(), RandomForestClassifier(),
+        '''Automated Model Comparasion'''
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
+        n = len(np.unique(y))
+        if task == 'classification':
+            if n == 2:
+                methods = [KNeighborsClassifier(), GaussianNB(), DecisionTreeClassifier(), RandomForestClassifier(),
                            AdaBoostClassifier(), GradientBoostingClassifier(), XGBClassifier(), LogisticRegression(),
                            SVC()]
-    		else:
-    			methods = [KNeighborsClassifier(), DecisionTreeClassifier(), RandomForestClassifier(),
+            else:
+                methods = [KNeighborsClassifier(), DecisionTreeClassifier(), RandomForestClassifier(),
                            AdaBoostClassifier(), GradientBoostingClassifier(), XGBClassifier(), SVC()]
-    	if task == 'regression':
-    		methods = [LinearRegression(), KNeighborsRegressor(), DecisionTreeRegressor(), RandomForestRegressor(),
+        if task == 'regression':
+            methods = [LinearRegression(), KNeighborsRegressor(), DecisionTreeRegressor(), RandomForestRegressor(),
                        AdaBoostRegressor(), GradientBoostingRegressor(), XGBRegressor(), SVR()]
-    	results = {}
-    	for i in range(len(methods)):
-    		model = methods[i].fit(X_train, y_train)
-    		test_acc = model.score(X_test, y_test)
-    		results[test_acc] = methods[i]
-    	return results[max(results)]
+        results = {}
+        for i in range(len(methods)):
+            model = methods[i].fit(X_train, y_train)
+            test_acc = model.score(X_test, y_test)
+            results[test_acc] = methods[i]
+        return results[max(results)]
 
 
 class DeepLearning:
@@ -195,10 +195,10 @@ class DeepLearning:
         return model
 
     def PipeIt(scaler, model, X, y):
-    	'''an sklearn pipeline that returns the train and test score with scaled data'''
-    	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
-    	pipe = Pipeline([('scaler', scaler), ('model', model)]).fit(X_train, y_train)
-    	return "Training: {}, Validation: {}".format(pipe.score(X_train, y_train), pipe.score(X_test, y_test))
+        '''an sklearn pipeline that returns the train and test score with scaled data'''
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
+        pipe = Pipeline([('scaler', scaler), ('model', model)]).fit(X_train, y_train)
+        return "Training: {}, Validation: {}".format(pipe.score(X_train, y_train), pipe.score(X_test, y_test))
     
     def FastNN(self, task, loss, output_dim=None, nodes=64, activation='relu', regularizer=None, stacking=False, dropout=False, nlayers=4, closer=False, optimizer='adam'):
         '''Build a FeedForward Network without filling in a bunch of parameters'''
@@ -487,6 +487,16 @@ class DeepLearning:
 
 
 class DataHelper:
+
+    def AMF(self, X):
+        vif_scores = pd.DataFrame(DataHelper().VifIt(X))
+        vif_scores.columns = ['vif']
+        vif_scores['fname'] = list(X.columns)
+        try:
+            df = X[list(vif_scores.loc[vif_scores['vif'] < 5.5]['fname'])]
+        except:
+            return 'your data sucks!!'
+        return df
     
     def HoldOut(self, data):
         '''puts 10% of the data into a seperate dataset for testing purposes'''
@@ -506,20 +516,20 @@ class DataHelper:
         return df
     
     def ScaleData(self, strategy, X, dim=None):
-    	'''Scales data via minmax, standard, mean, or PCA scaling'''
-    	if strategy == 'minmax':
-    		return pd.DataFrame(MinMaxScaler().fit(X).transform(X))
-    	if strategy == 'standard':
-    		return pd.DataFrame(StandardScaler().fit(X).transform(X))
-    	if strategy == 'mean':
-    		for col in X.columns:
-    			X[col] = (X[col] - min(X[col]))/ (max(X[col]) - min(X[col]))
-    		return X
-    	if strategy == 'pca':
-    		try:
-    			return pd.DataFrame(PCA(n_components=dim).fit_transform(X))
-    		except:
-    			return 'please pass an integer for dim'
+        '''Scales data via minmax, standard, mean, or PCA scaling'''
+        if strategy == 'minmax':
+            return pd.DataFrame(MinMaxScaler().fit(X).transform(X))
+        if strategy == 'standard':
+            return pd.DataFrame(StandardScaler().fit(X).transform(X))
+        if strategy == 'mean':
+            for col in X.columns:
+                X[col] = (X[col] - min(X[col]))/ (max(X[col]) - min(X[col]))
+            return X
+        if strategy == 'pca':
+            try:
+                return pd.DataFrame(PCA(n_components=dim).fit_transform(X))
+            except:
+                return 'please pass an integer for dim'
     
     def VifIt(self, X):
         '''returns VIF scores to help prevent multicolinearity'''
@@ -629,17 +639,17 @@ class Evaluater:
         return results, RMSE, round(score, 2)
     
     def BinaryCBA(self, model, X, y, rate, total_cost, discount):
-    	'''calculates the potential revenue with and of using the model to make decisions'''
-    	cm = confusion_matrix(y, model.predict(X))
-    	tn = cm[0][0] * rate
-    	fp = cm[0][1] * (rate-discount)
-    	fn = cm[1][0] * (total_cost) * -1
-    	tp = cm[1][1] * (rate-discount)
-    	ml = tn + fp + fn + tp
-    	n = (cm[0][0] + cm[0][1])*rate
-    	p = (cm[1][0] + cm[1][1])*total_cost*-1
-    	no = n + p
-    	return 'With this model: ${}, without ml: ${}'.format(ml, no)
+        '''calculates the potential revenue with and of using the model to make decisions'''
+        cm = confusion_matrix(y, model.predict(X))
+        tn = cm[0][0] * rate
+        fp = cm[0][1] * (rate-discount)
+        fn = cm[1][0] * (total_cost) * -1
+        tp = cm[1][1] * (rate-discount)
+        ml = tn + fp + fn + tp
+        n = (cm[0][0] + cm[0][1])*rate
+        p = (cm[1][0] + cm[1][1])*total_cost*-1
+        no = n + p
+        return 'With this model: ${}, without ml: ${}'.format(ml, no)
         
     def DoCohen(self, group1, group2):
         '''calculates Cohen's D between 2 population samples'''
@@ -679,266 +689,321 @@ class Evaluater:
       return auc(fpr, tpr)
 
     def ACE(self, fitted_model, metric, Xval, yval):
-    	'''Automated Classifier Evaluation'''
-    	ev = Evaluater()
-    	pred = fitted_model.predict(Xval)
-    	cm = confusion_matrix(yval, pred)
-    	if metric == 'accuracy':
-    		score1 = fitted_model.score(Xval, yval)
-    	if metric == 'recall':
-    		score1 = cm[1][1] / (cm[1][0] + cm[1][1])
-    	if metric == 'precision':
-    		score1 = cm[0][0] / (cm[0][0] + cm[0][1])
-    	score2 = ev.AUC(fitted_model, Xval, yval)
-    	return score1, score2
+        '''Automated Classifier Evaluation'''
+        ev = Evaluater()
+        pred = fitted_model.predict(Xval)
+        cm = confusion_matrix(yval, pred)
+        if metric == 'accuracy':
+            score1 = fitted_model.score(Xval, yval)
+        if metric == 'recall':
+            score1 = cm[1][1] / (cm[1][0] + cm[1][1])
+        if metric == 'precision':
+            score1 = cm[0][0] / (cm[0][0] + cm[0][1])
+        score2 = ev.AUC(fitted_model, Xval, yval)
+        return score1, score2
 
     def PipeIt(self, scaler, model, X, y, quiet=False):
-    	'''an sklearn pipeline that returns the train and test score with scaled data'''
-    	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
-    	pipe = Pipeline([('scaler', scaler), ('model', model)]).fit(X_train, y_train)
-    	if quiet == True:
-    		return pipe.score(X_test, y_test)
-    	else:
-    		return "Training: {}, Validation: {}".format(pipe.score(X_train, y_train), pipe.score(X_test, y_test))
+        '''an sklearn pipeline that returns the train and test score with scaled data'''
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
+        pipe = Pipeline([('scaler', scaler), ('model', model)]).fit(X_train, y_train)
+        if quiet == True:
+            return pipe.score(X_test, y_test)
+        else:
+            return "Training: {}, Validation: {}".format(pipe.score(X_train, y_train), pipe.score(X_test, y_test))
 
 
 class Algorithms:
 
     def Powers(self, n):
-    	'''returns how many times n is divisible by 2'''
-    	k = int(log(n, 2))
-    	return k
+        '''returns how many times n is divisible by 2'''
+        k = int(log(n, 2))
+        return k
 
     def Neighbors(self, X, y, task):
-    	'''returns n_neighbors to test in a KNN'''
-    	if task == 'classification':
-    		nclasses = len(np.unique(y))
-    		sizes = list(y.value_counts())
-    		neighbors1 = int(min(sizes)/10)
-    		neighbors2 = int(min(sizes)/nclasses)
-    		neighbors3 = int(neighbors1/2)
-    		return neighbors1, neighbors2, neighbors3
-    	if task == 'regression':
-    		n = int(0.05 * len(X))
-    		return list(range(1, n))
+        '''returns n_neighbors to test in a KNN'''
+        if task == 'classification':
+            nclasses = len(np.unique(y))
+            sizes = list(y.value_counts())
+            neighbors1 = int(min(sizes)/10)
+            neighbors2 = int(min(sizes)/nclasses)
+            neighbors3 = int(neighbors1/2)
+            return neighbors1, neighbors2, neighbors3
+        if task == 'regression':
+            n = int(0.05 * len(X))
+            return list(range(1, n))
 
     def Estimators(self, X, default):
-    	'''returns range of n_estimators to test'''
-    	step = int(len(X)/100)
-    	tests = [default]
-    	for i in range(1, 11):
-    		tests.append(i*step)
-    	return tests
+        '''returns range of n_estimators to test'''
+        step = int(len(X)/100)
+        tests = [default]
+        for i in range(1, 11):
+            tests.append(i*step)
+        return tests
 
     def GetMetric(self, y, fn):
-    	'''determines if the metric should be accuracy or recall'''
-    	total = len(y)
-    	sizes = list(y.value_counts())
-    	if max(sizes) > total*0.55:
-    		if fn == False:
-    			metric = 'recall'
-    		if fn == True:
-    			metric = 'precision'
-    	else:
-    		metric = 'accuracy'
-    	return metric
+        '''determines if the metric should be accuracy or recall'''
+        total = len(y)
+        sizes = list(y.value_counts())
+        if max(sizes) > total*0.55:
+            if fn == False:
+                metric = 'recall'
+            if fn == True:
+                metric = 'precision'
+        else:
+            metric = 'accuracy'
+        return metric
 
     def PickScaler(self, X, y, model):
-    	'''decides how to scale data'''
-    	ev = Evaluater()
-    	n_features = len(list(X.columns))
-    	if n_features >= 256:
-    		return 'pca'
-    	else:
-    		ss = ev.PipeIt(StandardScaler(), model, X, y, quiet=True)
-    		mm = ev.PipeIt(MinMaxScaler(), model, X, y, quiet=True)
-    		if ss >= mm:
-    			return 'standard'
-    		else:
-    			return 'minmax'
+        '''decides how to scale data'''
+        ev = Evaluater()
+        n_features = len(list(X.columns))
+        if n_features >= 256:
+            return 'pca'
+        else:
+            ss = ev.PipeIt(StandardScaler(), model, X, y, quiet=True)
+            mm = ev.PipeIt(MinMaxScaler(), model, X, y, quiet=True)
+            if ss >= mm:
+                return 'standard'
+            else:
+                return 'minmax'
 
     def ReduceTo(self, X):
-    	'''divides a n by 5 and converts it to an int'''
-    	return int(len(list(X.columns))/5)
+        '''divides a n by 5 and converts it to an int'''
+        return int(len(list(X.columns))/5)
 
     def ToTry(self, X):
-    	'''returns a list of k features to select from'''
-    	n_features = len(list(X.columns))
-    	if n_features >= 15:
-    		k = int(round(n_features/3))
-    		step = int(round(k/3))
-    		k_features = [k]
-    		for i in range(3):
-    			k += step
-    			k_features.append(k)
-    	else:
-    		k_features = [n_features-1, n_features-2, n_features-3, n_features-4]
-    	return k_features
+        '''returns a list of k features to select from'''
+        n_features = len(list(X.columns))
+        if n_features >= 15:
+            k = int(round(n_features/3))
+            step = int(round(k/3))
+            k_features = [k]
+            for i in range(3):
+                k += step
+                k_features.append(k)
+        else:
+            k_features = [n_features-1, n_features-2, n_features-3, n_features-4]
+        return k_features
 
 
 class Wrappers: 
 
-	def Vanilla(self, df, target_str, task):
-		'''returns the best vanilla model and a corresponding parameter grid'''
-		dh = DataHelper()
-		ml = MachineLearning()
-		al = Algorithms()
-		train, test = dh.HoldOut(df)
-		X = train.drop([target_str], axis='columns')
-		Xval = test.drop([target_str], axis='columns')
-		y = train[target_str]
-		yval = test[target_str]
-		vanilla = ml.AMC(X, y, task)
-		grid = None
-		if vanilla == LinearRegression():
-			grid = {'fit_intercept': [True, False]}
-		if vanilla == GaussianNB():
-			grid = {'var_smoothing': [1e-13, 1e-11, 1e-9, 1e-7, 1e-5]}
-		if vanilla == LogisticRegression():
-			grid = {'penalty': ['l1', 'l2', None], 'C': [0.1, 0.5, 1, 2, 10], 
-			'fit_intercept': [True, False]}
-		if vanilla == KNeighborsRegressor():
-			nearest = al.Neighbors(X, y, 'regression')
-			grid = {'n_neighbors': nearest}
-		if vanilla == KNeighborsClassifier():
-			neighbors1, neighbors2, neighbors3 = al.Neighbors(X, y, 'classification')
-			grid = {'n_neighbors': [5, neighbors1, neighbors2, neighbors3], 
-			'weights': ['uniform', 'distance'], 'p': [1, 2]}
-		if vanilla == DecisionTreeRegressor():
-			grid = {'max_depth': [2, 5, 8, None]} #add in other params later
-		if vanilla == DecisionTreeClassifier():
-			grid = {'criterion': ['gini', 'entropy'], 'splitter': ['best', 'random'], 'max_depth': [2, 5, 8, None]}
-		if vanilla == RandomForestRegressor():
-			estimators = al.Estimators(X, 100)
-			grid = {'n_estimators': estimators, 'criterion': ['mse', 'mae'], 
-			'max_depth': [2, 5, 8, None]}
-		if vanilla == RandomForestClassifier():
-			estimators = al.Estimators(X, 100)
-			grid = {'n_estimators': estimators, 'criterion': ['gini', 'entropy'], 
-			'max_depth': [2, 5, 8, None]}
-		if vanilla == AdaBoostRegressor():
-			estimators = al.Estimators(X, 50)
-			grid = {'n_estimators': estimators, 'learning_rate': [0.1, 0.5, 1], 
-			'loss': ['linear', 'square', 'exponential']}
-		if vanilla == AdaBoostClassifier():
-			estimators = al.Estimators(X, 50)
-			grid = {'n_estimators': estimators, 'learning_rate': [0.1, 0.5, 1], 'algorithm': ['SAMME', 'SAMME.R']}
-		if vanilla == GradientBoostingRegressor():
-			estimators = al.Estimators(X, 50)
-			grid = {'learning_rate': [0.1, 0.5, 1], 'n_estimators': estimators, 
-			'criterion': ['friedman_mse', 'mse', 'mae']}
-		if vanilla == GradientBoostingClassifier():
-			estimators = al.Estimators(X, 50)
-			grid = {'learning_rate': [0.1, 0.5, 1], 'n_estimators': estimators, 
-			'criterion': ['friedman_mse', 'mse', 'mae']}
-		if vanilla == XGBRegressor():
-			estimators = al.Estimators(X, 100)
-			grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
-			'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
-			'n_estimators': estimators}
-		if vanilla == XGBClassifier():
-			estimators = al.Estimators(X, 100)
-			grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
-			'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
-			'n_estimators': estimators}
-		if vanilla == SVR():
-			grid = {'kernel': ['linear', 'rbf'], 'gamma': ['scale', 'auto'], 
-			'C': [0.1, 1, 10]}
-		if vanilla == SVC():
-			grid = {'kernel': ['linear', 'rbf'], 'gamma': ['scale', 'auto'], 
-			'C': [0.1, 1, 10]}
-		else:
-			estimators = al.Estimators(X, 100)
-			grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
-			'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
-			'n_estimators': estimators}
-		return vanilla, grid, X, Xval, y, yval
+    def Vanilla(self, df, target_str, task):
+        '''returns the best vanilla model and a corresponding parameter grid'''
+        dh = DataHelper()
+        ml = MachineLearning()
+        al = Algorithms()
+        train, test = dh.HoldOut(df)
+        X = train.drop([target_str], axis='columns')
+        Xval = test.drop([target_str], axis='columns')
+        y = train[target_str]
+        yval = test[target_str]
+        vanilla = ml.AMC(X, y, task)
+        grid = None
+        if vanilla == LinearRegression():
+            grid = {'fit_intercept': [True, False]}
+        if vanilla == GaussianNB():
+            grid = {'var_smoothing': [1e-13, 1e-11, 1e-9, 1e-7, 1e-5]}
+        if vanilla == LogisticRegression():
+            grid = {'penalty': ['l1', 'l2', None], 'C': [0.1, 0.5, 1, 2, 10], 
+            'fit_intercept': [True, False]}
+        if vanilla == KNeighborsRegressor():
+            nearest = al.Neighbors(X, y, 'regression')
+            grid = {'n_neighbors': nearest}
+        if vanilla == KNeighborsClassifier():
+            neighbors1, neighbors2, neighbors3 = al.Neighbors(X, y, 'classification')
+            grid = {'n_neighbors': [5, neighbors1, neighbors2, neighbors3], 
+            'weights': ['uniform', 'distance'], 'p': [1, 2]}
+        if vanilla == DecisionTreeRegressor():
+            grid = {'max_depth': [2, 5, 8, None], 'criterion': ['mse', 'mae', 'poisson'], 
+            'splitter': ['best', 'random']} 
+        if vanilla == DecisionTreeClassifier():
+            grid = {'criterion': ['gini', 'entropy'], 'splitter': ['best', 'random'], 'max_depth': [2, 5, 8, None]}
+        if vanilla == RandomForestRegressor():
+            estimators = al.Estimators(X, 100)
+            grid = {'n_estimators': estimators, 'criterion': ['mse', 'mae'], 
+            'max_depth': [2, 5, 8, None]}
+        if vanilla == RandomForestClassifier():
+            estimators = al.Estimators(X, 100)
+            grid = {'n_estimators': estimators, 'criterion': ['gini', 'entropy'], 
+            'max_depth': [2, 5, 8, None]}
+        if vanilla == AdaBoostRegressor():
+            estimators = al.Estimators(X, 50)
+            grid = {'n_estimators': estimators, 'learning_rate': [0.1, 0.5, 1], 
+            'loss': ['linear', 'square', 'exponential']}
+        if vanilla == AdaBoostClassifier():
+            estimators = al.Estimators(X, 50)
+            grid = {'n_estimators': estimators, 'learning_rate': [0.1, 0.5, 1], 'algorithm': ['SAMME', 'SAMME.R']}
+        if vanilla == GradientBoostingRegressor():
+            estimators = al.Estimators(X, 50)
+            grid = {'learning_rate': [0.1, 0.5, 1], 'n_estimators': estimators, 
+            'criterion': ['friedman_mse', 'mse', 'mae']}
+        if vanilla == GradientBoostingClassifier():
+            estimators = al.Estimators(X, 50)
+            grid = {'learning_rate': [0.1, 0.5, 1], 'n_estimators': estimators, 
+            'criterion': ['friedman_mse', 'mse', 'mae']}
+        if vanilla == XGBRegressor():
+            estimators = al.Estimators(X, 100)
+            grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
+            'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
+            'n_estimators': estimators}
+        if vanilla == XGBClassifier():
+            estimators = al.Estimators(X, 100)
+            grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
+            'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
+            'n_estimators': estimators}
+        if vanilla == SVR():
+            grid = {'kernel': ['linear', 'rbf'], 'gamma': ['scale', 'auto'], 
+            'C': [0.1, 1, 10]}
+        if vanilla == SVC():
+            grid = {'kernel': ['linear', 'rbf'], 'gamma': ['scale', 'auto'], 
+            'C': [0.1, 1, 10]}
+        else:
+            if task == 'classification':
+                vanilla = XGBClassifier()
+            if task == 'regression':
+                vanilla = XGBRegressor()
+            estimators = al.Estimators(X, 100)
+            grid = {'learning_rate': [0.1, 0.2], 'max_depth': [3, 6, 9], 
+            'min_child_weight': [1, 2], 'subsample': [0.5, 0.7, 1], 
+            'n_estimators': estimators}
+        return vanilla, grid, X, Xval, y, yval
 
-	def SmoteStack(self, X, y, Xval, yval, model, parameters, metric):
-		'''Smotes a dataset and evaluates model on it'''
-		dh = DataHelper()
-		ml = MachineLearning()
-		ev = Evaluater()
-		X2, y2 = dh.SmoteIt(X, y)
-		clf = ml.Optimize(model, parameters, X2, y2)
-		clf.fit(X2, y2)
-		scores = ev.ACE(clf, metric, Xval, yval)
-		return scores, clf, X2, y2
+    def SmoteStack(self, X, y, Xval, yval, model, parameters, metric):
+        '''Smotes a dataset and evaluates model on it'''
+        dh = DataHelper()
+        ml = MachineLearning()
+        ev = Evaluater()
+        X2, y2 = dh.SmoteIt(X, y)
+        clf = ml.Optimize(model, parameters, X2, y2)
+        clf.fit(X2, y2)
+        scores = ev.ACE(clf, metric, Xval, yval)
+        return scores, clf, X2, y2
 
-	def FeatureEngineering(self, X, y, Xval, yval, model, task, metric, quiet=False):
-		'''experiments with different k features'''
-		al = Algorithms()
-		dh = DataHelper()
-		ev = Evaluater()
-		try_list = al.ToTry(X)
-		results = {}
-		for i in range(len(try_list)):
-			X2 = dh.MakeNewDF(X, y, try_list[i])
-			Xv2 = Xval[list(X2.columns)]
-			model.fit(X2, y)
-			if task == 'classification': #add in regression later on
-				score1, score2 = ev.ACE(model, metric, Xv2, yval)
-				s1 = metric
-				s2 = 'auc'
-			if quiet == False:
-				print('with {} features we got a {} of {} and a {} of {}'.format(try_list[i], s1, score1, s2, score2))
-			final_score = (score1+score2)/2
-			results[final_score] = try_list[i]
-		final = results[max(results)]
-		X3 = dh.MakeNewDF(X, y, final)
-		Xv3 = Xval[list(X3.columns)]
-		return X3, Xv3
+    def FeatureEngineering(self, X, y, Xval, yval, model, task, metric):
+        '''experiments with different k features'''
+        al = Algorithms()
+        dh = DataHelper()
+        ev = Evaluater()
+        try_list = al.ToTry(X)
+        results = {}
+        for i in range(len(try_list)):
+            X2 = dh.MakeNewDF(X, y, try_list[i])
+            Xv2 = Xval[list(X2.columns)]
+            model.fit(X2, y)
+            if task == 'classification': #add in regression later on
+                score1, score2 = ev.ACE(model, metric, Xv2, yval)
+                score = (score1+score2)/2
+            if task == 'regression':
+                score = model.fit(Xv2, yval)
+            results[score] = try_list[i]
+        final = results[max(results)]
+        X3 = dh.MakeNewDF(X, y, final)
+        Xv3 = Xval[list(X3.columns)]
+        return X3, Xv3
 
-	def ClfLoop(self, vanilla, grid, X, Xval, y, yval, fn):
-		'''finds the best classifier'''
-		al = Algorithms()
-		ev = Evaluater()
-		ml = MachineLearning()
-		dh = DataHelper()
-		wr = Wrappers()
-		results = {}
-		metric = al.GetMetric(y, fn)
-		clf1 = vanilla
-		clf1.fit(X, y)
-		scores1 = ev.ACE(clf1, metric, Xval, yval) 
-		results[(scores1[0] + scores1[1])/2] = clf1 #[clf1, X]
-		clf2 = ml.Optimize(vanilla, grid, X, y, metric=metric)
-		clf2.fit(X, y)
-		scores2 = ev.ACE(clf2, metric, Xval, yval) 
-		results[(scores2[0] + scores2[1])/2] = clf2
-		scaler = al.PickScaler(X, y, clf2)
-		if scaler == 'pca':
-			dim = al.ReduceTo(X)
-			X3 = dh.ScaleData(scaler, X, dim=dim)
-			Xv3 = dh.ScaleData(scaler, Xval, dim=dim)
-		else:
-			X3 = dh.ScaleData(scaler, X)
-			X3.columns = list(X.columns)
-			Xv3 = dh.ScaleData(scaler, Xval)
-			Xv3.columns = list(X.columns)
-		clf3 = ml.Optimize(vanilla, grid, X3, y, metric=metric)
-		scores3 = ev.ACE(clf3, metric, Xv3, yval) 
-		results[(scores3[0] + scores3[1])/2] = clf3
-		if metric != 'accuracy':
-			print('Smoting!!')
-			scores4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla, grid, metric)
-		else:
-			X4 = X3
-			y4 = y
-			scores4 = scores3
-			clf4 = clf3
-		results[(scores4[0] + scores4[1])/2] = clf4
-		X5, Xv5 = wr.FeatureEngineering(X4, y4, Xv3, yval, clf4, 'classification', metric, quiet=True)
-		clf5 = ml.Optimize(vanilla, grid, X5, y4)
-		clf5.fit(X5, y4)
-		scores5 = ev.ACE(clf5, metric, Xv5, yval)
-		results[(scores5[0] + scores5[1])/2] = clf5
-		return results[max(results)]
+    def ClfLoop(self, vanilla, grid, X, Xval, y, yval, fn):
+        '''finds the best classifier'''
+        al = Algorithms()
+        ev = Evaluater()
+        ml = MachineLearning()
+        dh = DataHelper()
+        wr = Wrappers()
+        results = {}
+        metric = al.GetMetric(y, fn)
+        clf1 = vanilla
+        clf1.fit(X, y)
+        scores1 = ev.ACE(clf1, metric, Xval, yval) 
+        results[(scores1[0] + scores1[1])/2] = clf1, X, y, None, None
+        clf2 = ml.Optimize(vanilla, grid, X, y, metric=metric)
+        clf2.fit(X, y)
+        scores2 = ev.ACE(clf2, metric, Xval, yval) 
+        results[(scores2[0] + scores2[1])/2] = clf2, X, y, None, None
+        scaler = al.PickScaler(X, y, clf2)
+        if scaler == 'pca':
+            dim = al.ReduceTo(X)
+            X3 = dh.ScaleData(scaler, X, dim=dim)
+            Xv3 = dh.ScaleData(scaler, Xval, dim=dim)
+        else:
+            dim = None
+            X3 = dh.ScaleData(scaler, X)
+            X3.columns = list(X.columns)
+            Xv3 = dh.ScaleData(scaler, Xval)
+            Xv3.columns = list(X.columns)
+        clf3 = ml.Optimize(vanilla, grid, X3, y, metric=metric)
+        scores3 = ev.ACE(clf3, metric, Xv3, yval) 
+        results[(scores3[0] + scores3[1])/2] = clf3, X3, y, scaler, dim
+        if metric != 'accuracy':
+            print('Smoting!!')
+            scores4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla, grid, metric)
+        else:
+            X4 = X3
+            y4 = y
+            scores4 = scores3
+            clf4 = clf3
+        results[(scores4[0] + scores4[1])/2] = clf4, X4, y4, scaler, dim
+        X5, Xv5 = wr.FeatureEngineering(X4, y4, Xv3, yval, clf4, 'classification', metric)
+        clf5 = ml.Optimize(vanilla, grid, X5, y4)
+        clf5.fit(X5, y4)
+        scores5 = ev.ACE(clf5, metric, Xv5, yval)
+        results[(scores5[0] + scores5[1])/2] = clf5, X5, y4, scaler, dim
+        return results[max(results)]
 
-	def ClfOn(self):
-		return None
-		
+    def RegLoop(self, vanilla, grid, X, Xval, y, yval):
+        ml = MachineLearning()
+        dh = DataHelper()
+        wr = Wrappers()
+        al = Algorithms()
+        results = {}
+        reg1 = vanilla
+        reg1.fit(X, y)
+        score1 = reg1.score(Xval, yval)
+        results[score1] = reg1, X, y, None, None
+        reg2 = ml.Optimize(vanilla, grid, X, y)
+        reg1.fit(X, y)
+        score2 = reg2.score(Xval, yval)
+        results[score2] = reg2, X, y, None, None
+        scaler = al.PickScaler(X, y, reg2)
+        if scaler == 'pca':
+            dim = al.ReduceTo(X)
+            X3 = dh.ScaleData(scaler, X, dim=dim)
+            Xv3 = dh.ScaleData(scaler, Xval, dim=dim)
+        else:
+            dim = None
+            X3 = dh.ScaleData(scaler, X)
+            X3.columns = list(X.columns)
+            Xv3 = dh.ScaleData(scaler, Xval)
+            Xv3.columns = list(Xval.columns)
+        reg3 = ml.Optimize(vanilla, grid, X3, y)
+        reg3.fit(X3, y)
+        score3 = reg3.score(Xv3, yval)
+        results[score3] = reg3, X3, y, scaler, dim
+        X4, Xv4 = wr.FeatureEngineering(X3, y, Xv3, yval, reg3, 'regression', 'accuracy')
+        reg4 = ml.Optimize(vanilla, grid, X4, y)
+        reg4.fit(X4, y)
+        score4 = reg4.score(Xv4, yval)
+        results[score4] = reg4, X4, y, scaler, dim
+        X5 = dh.AMF(X4)
+        Xv5 = Xv4[list(X5.columns)]
+        reg5 = ml.Optimize(vanilla, grid, X5, y)
+        reg5.fit(X5, y)
+        score5 = reg5.score(Xv5, yval)
+        results[score5] = reg5, X5, y, scaler, dim
+        return results[max(results)]
 
-vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv')
-vanilla, grid, X, Xval, y, yval = Wrappers().Vanilla(vt, 'churn', 'classification')
-print(Wrappers().ClfLoop(vanilla, grid, X, Xval, y, yval, False))
+    def WrapML(self, df, target_str, task, fn=False):
+        wr = Wrappers()
+        vanilla, grid, X, Xval, y, yval = wr.Vanilla(df, target_str, task)
+        if task == 'classification':
+            information = wr.ClfLoop(vanilla, grid, X, Xval, y, yval, fn)
+        if task == 'regression':
+            information = wr.RegLoop(vanilla, grid, X, Xval, y, yval)
+        return information
+
+#vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv')
+from sklearn.datasets import load_boston
+vt = pd.DataFrame(load_boston()['data'])
+vt.columns = list(load_boston()['feature_names'])
+vt['price'] = load_boston()['target']
+
+print(Wrappers().WrapML(vt, 'price', 'regression'))
