@@ -688,7 +688,7 @@ class Evaluater:
       fpr, tpr, threshold = roc_curve(yval, pred)
       return auc(fpr, tpr)
 
-    def ACE(self, fitted_model, metric, Xval, yval):
+    def ACE(self, fitted_model, metric, Xval, yval, merged=True):
         '''Automated Classifier Evaluation'''
         ev = Evaluater()
         pred = fitted_model.predict(Xval)
@@ -700,7 +700,10 @@ class Evaluater:
         if metric == 'precision':
             score1 = cm[0][0] / (cm[0][0] + cm[0][1])
         score2 = ev.AUC(fitted_model, Xval, yval)
-        return score1, score2
+        if merged == False:
+            return score1, score2
+        else:
+            return (score1*0.8)+(score2*0.2)
 
     def PipeIt(self, scaler, model, X, y, quiet=False):
         '''an sklearn pipeline that returns the train and test score with scaled data'''
@@ -768,7 +771,7 @@ class Algorithms:
                 return 'minmax'
 
     def ReduceTo(self, X):
-        '''divides a n by 5 and converts it to an int'''
+        '''divides a n columns 5 and converts it to an int'''
         return int(len(list(X.columns))/5)
 
     def ToTry(self, X):
@@ -877,8 +880,8 @@ class Wrappers:
         X2, y2 = dh.SmoteIt(X, y)
         clf = ml.Optimize(model, parameters, X2, y2)
         clf.fit(X2, y2)
-        scores = ev.ACE(clf, metric, Xval, yval)
-        return scores, clf, X2, y2
+        score = ev.ACE(clf, metric, Xval, yval)
+        return score, clf, X2, y2
 
     def FeatureEngineering(self, X, y, Xval, yval, model, task, metric):
         '''experiments with different k features'''
@@ -892,8 +895,7 @@ class Wrappers:
             Xv2 = Xval[list(X2.columns)]
             model.fit(X2, y)
             if task == 'classification': #add in regression later on
-                score1, score2 = ev.ACE(model, metric, Xv2, yval)
-                score = (score1+score2)/2
+                score = ev.ACE(model, metric, Xv2, yval)
             if task == 'regression':
                 score = model.fit(Xv2, yval)
             results[score] = try_list[i]
@@ -913,13 +915,14 @@ class Wrappers:
         metric = al.GetMetric(y, fn)
         clf1 = vanilla
         clf1.fit(X, y)
-        scores1 = ev.ACE(clf1, metric, Xval, yval) 
-        results[(scores1[0] + scores1[1])/2] = clf1, X, y, None, None
+        score1 = ev.ACE(clf1, metric, Xval, yval) 
+        results[score1] = clf1, X, y, None, None
         clf2 = ml.Optimize(vanilla, grid, X, y, metric=metric)
         clf2.fit(X, y)
-        scores2 = ev.ACE(clf2, metric, Xval, yval) 
-        results[(scores2[0] + scores2[1])/2] = clf2, X, y, None, None
+        score2 = ev.ACE(clf2, metric, Xval, yval) 
+        results[score2] = clf2, X, y, None, None
         scaler = al.PickScaler(X, y, clf2)
+        print(scaler)
         if scaler == 'pca':
             dim = al.ReduceTo(X)
             X3 = dh.ScaleData(scaler, X, dim=dim)
@@ -931,22 +934,22 @@ class Wrappers:
             Xv3 = dh.ScaleData(scaler, Xval)
             Xv3.columns = list(X.columns)
         clf3 = ml.Optimize(vanilla, grid, X3, y, metric=metric)
-        scores3 = ev.ACE(clf3, metric, Xv3, yval) 
-        results[(scores3[0] + scores3[1])/2] = clf3, X3, y, scaler, dim
+        score3 = ev.ACE(clf3, metric, Xv3, yval) 
+        results[score3] = clf3, X3, y, scaler, dim
         if metric != 'accuracy':
             print('Smoting!!')
-            scores4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla, grid, metric)
+            score4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla, grid, metric)
         else:
             X4 = X3
             y4 = y
-            scores4 = scores3
+            score4 = score3
             clf4 = clf3
-        results[(scores4[0] + scores4[1])/2] = clf4, X4, y4, scaler, dim
+        results[score4] = clf4, X4, y4, scaler, dim
         X5, Xv5 = wr.FeatureEngineering(X4, y4, Xv3, yval, clf4, 'classification', metric)
         clf5 = ml.Optimize(vanilla, grid, X5, y4)
         clf5.fit(X5, y4)
-        scores5 = ev.ACE(clf5, metric, Xv5, yval)
-        results[(scores5[0] + scores5[1])/2] = clf5, X5, y4, scaler, dim
+        score5 = ev.ACE(clf5, metric, Xv5, yval)
+        results[score5] = clf5, X5, y4, scaler, dim
         return results[max(results)]
 
     def RegLoop(self, vanilla, grid, X, Xval, y, yval):
@@ -995,15 +998,28 @@ class Wrappers:
         wr = Wrappers()
         vanilla, grid, X, Xval, y, yval = wr.Vanilla(df, target_str, task)
         if task == 'classification':
-            information = wr.ClfLoop(vanilla, grid, X, Xval, y, yval, fn)
+            model, X, y, scaler, dim = wr.ClfLoop(vanilla, grid, X, Xval, y, yval, fn)
         if task == 'regression':
-            information = wr.RegLoop(vanilla, grid, X, Xval, y, yval)
-        return information
+            model, X, y, scaler, dim = wr.RegLoop(vanilla, grid, X, Xval, y, yval)
+        df2 = X
+        df2[target_str] = y 
+        if len(list(df2.columns)) >= 52:
+            return model, df2, scaler, dim
+        else:
+            return model, df2, scaler
 
-#vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv')
-from sklearn.datasets import load_boston
-vt = pd.DataFrame(load_boston()['data'])
-vt.columns = list(load_boston()['feature_names'])
-vt['price'] = load_boston()['target']
+    def Mantain(self, model, base_data, new_data, scaler):
+        if type(new_data) == dict:
+            add = pd.DataFrame(new_data)
+        else:
+            add = new_data
+        df = pd.concat([base_data, add]).reset_index()
+        return None
 
-print(Wrappers().WrapML(vt, 'price', 'regression'))
+vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv')
+#from sklearn.datasets import load_boston
+#vt = pd.DataFrame(load_boston()['data'])
+#vt.columns = list(load_boston()['feature_names'])
+#vt['price'] = load_boston()['target']
+
+print(Wrappers().WrapML(vt, 'churn', 'classification'))
