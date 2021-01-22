@@ -699,11 +699,7 @@ class Evaluater:
             score1 = cm[1][1] / (cm[1][0] + cm[1][1])
         if metric == 'precision':
             score1 = cm[0][0] / (cm[0][0] + cm[0][1])
-        score2 = ev.AUC(fitted_model, Xval, yval)
-        if merged == False:
-            return score1, score2
-        else:
-            return (score1*0.8)+(score2*0.2)
+        return score1
 
     def PipeIt(self, scaler, model, X, y, quiet=False):
         '''an sklearn pipeline that returns the train and test score with scaled data'''
@@ -787,6 +783,14 @@ class Algorithms:
         else:
             k_features = [n_features-1, n_features-2, n_features-3, n_features-4]
         return k_features
+
+    def Imbalanced(self, y):
+        total = len(y)
+        sizes = list(y.value_counts())
+        if max(sizes) > total*0.55:
+            return True
+        else:
+            return False
 
 
 class Wrappers: 
@@ -1003,23 +1007,45 @@ class Wrappers:
             model, X, y, scaler, dim = wr.RegLoop(vanilla, grid, X, Xval, y, yval)
         df2 = X
         df2[target_str] = y 
-        if len(list(df2.columns)) >= 52:
-            return model, df2, scaler, dim
-        else:
-            return model, df2, scaler
+        return model, df2, scaler, dim
 
-    def Mantain(self, model, base_data, new_data, scaler):
+    def Mantain(self, model, base_data, new_data, scaler, dim, task, target_str):
+        al = Algorithms()
+        dh = DataHelper()
         if type(new_data) == dict:
             add = pd.DataFrame(new_data)
         else:
-            add = new_data
+            try:
+                add = new_data
+            except:
+                print('please pass a dictionary or dataframe for "new_data"')
         df = pd.concat([base_data, add]).reset_index()
-        return None
+        X = df.drop([target_str])
+        y = df[target_str]
+        if task == 'classification':
+            if al.Imbalanced(y) == True:
+                X2, y2 = dh.SmoteIt(X, y)
+            else:
+                X2, y2 = X, y
+        else:
+            X2, y2 = X, y
+        if scaler != None:
+            X3 = dh.ScaleData(scaler, X2, dim=dim)
+        else:
+            X3 = X2
+        model.fit(X2, y2) 
+        df2 = X2
+        df2[target_str] = y2
+        return model, df2
 
 vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv')
+
 #from sklearn.datasets import load_boston
 #vt = pd.DataFrame(load_boston()['data'])
 #vt.columns = list(load_boston()['feature_names'])
 #vt['price'] = load_boston()['target']
 
-print(Wrappers().WrapML(vt, 'churn', 'classification'))
+test = DataHelper().HoldOut(vt)[1]
+Xval = test.drop(['churn'], axis='columns')
+yval = test['churn']
+model = Wrappers().WrapML(vt, 'churn', 'classification')[0]
