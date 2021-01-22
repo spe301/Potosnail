@@ -876,14 +876,15 @@ class Wrappers:
             'n_estimators': estimators}
         return vanilla, grid, X, Xval, y, yval
 
-    def SmoteStack(self, X, y, Xval, yval, model, parameters, metric):
+    def SmoteStack(self, X, y, Xval, yval, model, parameters, metric, alone=False):
         '''Smotes a dataset and evaluates model on it'''
         dh = DataHelper()
         ml = MachineLearning()
         ev = Evaluater()
         X2, y2 = dh.SmoteIt(X, y)
         clf = ml.Optimize(model, parameters, X2, y2)
-        clf.fit(X2, y2)
+        if alone == True:
+            clf.fit(X2, y2)
         score = ev.ACE(clf, metric, Xval, yval)
         return score, clf, X2, y2
 
@@ -908,8 +909,8 @@ class Wrappers:
         Xv3 = Xval[list(X3.columns)]
         return X3, Xv3
 
-    def ClfLoop(self, vanilla, grid, X, Xval, y, yval, fn):
-        '''finds the best classifier'''
+    def ClfLoop(self, vanilla, grid, X, Xval, y, yval, fn, quiet=True):
+        '''finds the best classifier and associated dataset'''
         al = Algorithms()
         ev = Evaluater()
         ml = MachineLearning()
@@ -919,14 +920,22 @@ class Wrappers:
         metric = al.GetMetric(y, fn)
         clf1 = vanilla
         clf1.fit(X, y)
-        score1 = ev.ACE(clf1, metric, Xval, yval) 
+        score1 = ev.ACE(clf1, metric, Xval, yval)
+        if quiet == False:
+            print(plot_confusion_matrix(clf1, Xval, yval))
+            print('Raw Vanilla')
+            auc = ev.AUC(clf1, Xval, yval)
+            print('{} is {} and AUC is {}'.format(metric, score1, auc)) #check to see if AUC works for multiclass
         results[score1] = clf1, X, y, None, None
         clf2 = ml.Optimize(vanilla, grid, X, y, metric=metric)
-        clf2.fit(X, y)
-        score2 = ev.ACE(clf2, metric, Xval, yval) 
+        score2 = ev.ACE(clf2, metric, Xval, yval)
+        if quiet == False:
+            print(plot_confusion_matrix(clf2, Xval, yval))
+            print('Raw Data, Optimized Model')
+            auc = ev.AUC(clf2, Xval, yval)
+            print('{} is {} and AUC is {}'.format(metric, score2, auc))
         results[score2] = clf2, X, y, None, None
         scaler = al.PickScaler(X, y, clf2)
-        print(scaler)
         if scaler == 'pca':
             dim = al.ReduceTo(X)
             X3 = dh.ScaleData(scaler, X, dim=dim)
@@ -939,6 +948,14 @@ class Wrappers:
             Xv3.columns = list(X.columns)
         clf3 = ml.Optimize(vanilla, grid, X3, y, metric=metric)
         score3 = ev.ACE(clf3, metric, Xv3, yval) 
+        if quiet == False:
+            print(plot_confusion_matrix(clf3, Xv3, yval))
+            if dim == None:
+                print('Data is scaled with {} scaler, Model is optimized'.format(scaler))
+            if dim != None:
+                print('Data is reduced to {} features with PCA, Model is optimized'.format(dim))
+            auc = ev.AUC(clf3, Xv3, yval)
+            print('{} is {} and AUC is {}'.format(metric, score3, auc))
         results[score3] = clf3, X3, y, scaler, dim
         if metric != 'accuracy':
             print('Smoting!!')
@@ -948,27 +965,53 @@ class Wrappers:
             y4 = y
             score4 = score3
             clf4 = clf3
+        if quiet == False:
+            print(plot_confusion_matrix(clf4, Xv3, yval))
+            if dim == None:
+                print('Data is scaled with {} scaler and Smoted. Model is optimized'.format(scaler))
+            if dim != None:
+                print('Data is reduced to {} features with PCA and Smoted. Model is optimized'.format(dim))
+            auc = ev.AUC(clf4, Xv3, yval)
+            print('{} is {} and AUC is {}'.format(metric, score4, auc))
         results[score4] = clf4, X4, y4, scaler, dim
         X5, Xv5 = wr.FeatureEngineering(X4, y4, Xv3, yval, clf4, 'classification', metric)
         clf5 = ml.Optimize(vanilla, grid, X5, y4)
-        clf5.fit(X5, y4)
         score5 = ev.ACE(clf5, metric, Xv5, yval)
+        if quiet == False:
+            print(plot_confusion_matrix(clf5, Xv5, yval))
+            if dim == None:
+                print('Data is scaled with {} scaler and Smoted. Model is optimized'.format(scaler))
+            if dim != None:
+                print('Data is reduced to {} features with PCA and Smoted. Model is optimized'.format(dim))
+            feats = list(X5.columns)
+            print('Using {} as features'.format(feats))
+            auc = ev.AUC(clf5, Xv5, yval)
+            print('{} is {} and AUC is {}'.format(metric, score5, auc))
         results[score5] = clf5, X5, y4, scaler, dim
         return results[max(results)]
 
-    def RegLoop(self, vanilla, grid, X, Xval, y, yval):
+    def RegLoop(self, vanilla, grid, X, Xval, y, yval, quiet=True):
+        '''finds the best regressor and associated dataset'''
         ml = MachineLearning()
         dh = DataHelper()
         wr = Wrappers()
         al = Algorithms()
+        ev = Evaluater()
         results = {}
         reg1 = vanilla
         reg1.fit(X, y)
         score1 = reg1.score(Xval, yval)
+        if quiet == False:
+            print('Raw Vanilla')
+            RMSE, Accuracy = ev.EvaluateRegressor(reg1, X, Xval, y, yval)[1:]
+            print('RMSE = {}, Accuracy = {}%'.format(RMSE, Accuracy))
         results[score1] = reg1, X, y, None, None
         reg2 = ml.Optimize(vanilla, grid, X, y)
-        reg1.fit(X, y)
         score2 = reg2.score(Xval, yval)
+        if quiet == False:
+            print('Raw Data, Optimized Model')
+            RMSE, Accuracy = ev.EvaluateRegressor(reg2, X, Xval, y, yval)[1:]
+            print('RMSE = {}, Accuracy = {}%'.format(RMSE, Accuracy))
         results[score2] = reg2, X, y, None, None
         scaler = al.PickScaler(X, y, reg2)
         if scaler == 'pca':
@@ -982,23 +1025,30 @@ class Wrappers:
             Xv3 = dh.ScaleData(scaler, Xval)
             Xv3.columns = list(Xval.columns)
         reg3 = ml.Optimize(vanilla, grid, X3, y)
-        reg3.fit(X3, y)
         score3 = reg3.score(Xv3, yval)
+        if quiet == False:
+            if dim == None:
+                print('Data is scaled with {} scaler, Model is optimized'.format(scaler))
+            if dim != None:
+                print('Data is reduced to {} features with PCA, Model is optimized'.format(dim))
+            RMSE, Accuracy = ev.EvaluateRegressor(reg3, X3, Xv3, y, yval)
+            print('RMSE = {}, Accuracy = {}%'.format(RMSE, Accuracy))
         results[score3] = reg3, X3, y, scaler, dim
         X4, Xv4 = wr.FeatureEngineering(X3, y, Xv3, yval, reg3, 'regression', 'accuracy')
         reg4 = ml.Optimize(vanilla, grid, X4, y)
-        reg4.fit(X4, y)
+        #reg4.fit(X4, y)
         score4 = reg4.score(Xv4, yval)
         results[score4] = reg4, X4, y, scaler, dim
         X5 = dh.AMF(X4)
         Xv5 = Xv4[list(X5.columns)]
         reg5 = ml.Optimize(vanilla, grid, X5, y)
-        reg5.fit(X5, y)
+        #reg5.fit(X5, y)
         score5 = reg5.score(Xv5, yval)
         results[score5] = reg5, X5, y, scaler, dim
         return results[max(results)]
 
     def WrapML(self, df, target_str, task, fn=False):
+        '''Modeling process for traditional ml on tabular data'''
         wr = Wrappers()
         vanilla, grid, X, Xval, y, yval = wr.Vanilla(df, target_str, task)
         if task == 'classification':
@@ -1009,7 +1059,8 @@ class Wrappers:
         df2[target_str] = y 
         return model, df2, scaler, dim
 
-    def Mantain(self, model, base_data, new_data, scaler, dim, task, target_str):
+    def Mantain(self, model, base_data, new_data, scaler, dim, task, target_str): #need a train test split to prevent overfitting in the future
+        '''allows for adding new data and model retraining'''
         al = Algorithms()
         dh = DataHelper()
         if type(new_data) == dict:
@@ -1038,14 +1089,16 @@ class Wrappers:
         df2[target_str] = y2
         return model, df2
 
-vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv')
+vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv').drop(['Unnamed: 0'], axis='columns')
 
 #from sklearn.datasets import load_boston
 #vt = pd.DataFrame(load_boston()['data'])
 #vt.columns = list(load_boston()['feature_names'])
 #vt['price'] = load_boston()['target']
 
-test = DataHelper().HoldOut(vt)[1]
-Xval = test.drop(['churn'], axis='columns')
-yval = test['churn']
-model = Wrappers().WrapML(vt, 'churn', 'classification')[0]
+print(Wrappers().WrapML(vt, 'churn', 'classification')[:2])
+#test = DataHelper().HoldOut(vt)[1]
+#Xval = test[list(df.columns)].drop(['price'], axis='columns')
+#yval = test['price']
+#X = df.drop(['price'], axis='columns')
+#y = df['price']
