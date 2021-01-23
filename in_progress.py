@@ -259,7 +259,6 @@ class DeepLearning:
               model.add(layers.Bidirectional(layers.GRU(nodes)))
         if dropout == True:
           model.add(layers.Dropout(0.5))
-        dl = DeepLearning()
         if stacking == True:
           nodes = nodes//2
           if method == 'LSTM':
@@ -553,8 +552,23 @@ class DataHelper:
             for i in range(len(classes)):
                 dirs.append(os.path.join(test_dir, rc[i]))
         return dirs
+    
+    def GetCats(self, X): #test this out
+        feats = list(X.columns)
+        boolys = []
+        for feat in feats:
+            if list(np.unique(X[feat])) == [0, 1]:
+                boolys.append(True)
+            if list(np.unique(X[feat])) == [0.0, 1.0]:
+                boolys.append(True)
+            else:
+                boolys.append(False)
+        if len(boolys) == 0:
+            return None 
+        else:
+            return np.array(boolys)
+        
                 
-         
 class Evaluater:
     
     def ScoreModel(self, model, X, y):
@@ -572,7 +586,6 @@ class Evaluater:
         
     def BuildConfusionDL(self, model, X, y, normalize='true', cmap='Blues'):
       '''displays a confusion matrix to evaluate a deep learning classifier'''
-      yhat = []
       yreal = y.argmax(axis=1)
       pred = model.predict(X)
       prediction = pred.argmax(axis=1)
@@ -690,7 +703,6 @@ class Evaluater:
 
     def ACE(self, fitted_model, metric, Xval, yval, merged=True):
         '''Automated Classifier Evaluation'''
-        ev = Evaluater()
         pred = fitted_model.predict(Xval)
         cm = confusion_matrix(yval, pred)
         if metric == 'accuracy':
@@ -709,6 +721,20 @@ class Evaluater:
             return pipe.score(X_test, y_test)
         else:
             return "Training: {}, Validation: {}".format(pipe.score(X_train, y_train), pipe.score(X_test, y_test))
+        
+    def InspectTree(self, tree, X, y, forest=False):
+        ev = Evaluater()
+        clf = tree.fit(X, y)
+        if forest == True:
+            try:
+                return ev.GetImportance(clf, X, y)
+            except:
+                return 'please pass a RandomForestClassifier or other ensemble model for "tree"'
+        else:
+            try:
+                return ev.BuildTree(clf)
+            except:
+                return 'please pass a DecisionTreeClassifier or other tree model for "tree"'
 
 
 class Algorithms:
@@ -791,7 +817,7 @@ class Algorithms:
             return True
         else:
             return False
-
+        
 
 class Wrappers: 
 
@@ -911,6 +937,8 @@ class Wrappers:
 
     def ClfLoop(self, vanilla, grid, X, Xval, y, yval, fn, quiet=True):
         '''finds the best classifier and associated dataset'''
+        if quiet == False:
+            print(vanilla)
         al = Algorithms()
         ev = Evaluater()
         ml = MachineLearning()
@@ -922,7 +950,8 @@ class Wrappers:
         clf1.fit(X, y)
         score1 = ev.ACE(clf1, metric, Xval, yval)
         if quiet == False:
-            print(plot_confusion_matrix(clf1, Xval, yval))
+            plot_confusion_matrix(clf1, Xval, yval);
+            plt.show()
             print('Raw Vanilla')
             auc = ev.AUC(clf1, Xval, yval)
             print('{} is {} and AUC is {}'.format(metric, score1, auc)) #check to see if AUC works for multiclass
@@ -930,7 +959,8 @@ class Wrappers:
         clf2 = ml.Optimize(vanilla, grid, X, y, metric=metric)
         score2 = ev.ACE(clf2, metric, Xval, yval)
         if quiet == False:
-            print(plot_confusion_matrix(clf2, Xval, yval))
+            plot_confusion_matrix(clf2, Xval, yval)
+            plt.show()
             print('Raw Data, Optimized Model')
             auc = ev.AUC(clf2, Xval, yval)
             print('{} is {} and AUC is {}'.format(metric, score2, auc))
@@ -949,7 +979,8 @@ class Wrappers:
         clf3 = ml.Optimize(vanilla, grid, X3, y, metric=metric)
         score3 = ev.ACE(clf3, metric, Xv3, yval) 
         if quiet == False:
-            print(plot_confusion_matrix(clf3, Xv3, yval))
+            plot_confusion_matrix(clf3, Xv3, yval)
+            plt.show()
             if dim == None:
                 print('Data is scaled with {} scaler, Model is optimized'.format(scaler))
             if dim != None:
@@ -966,7 +997,8 @@ class Wrappers:
             score4 = score3
             clf4 = clf3
         if quiet == False:
-            print(plot_confusion_matrix(clf4, Xv3, yval))
+            plot_confusion_matrix(clf4, Xv3, yval)
+            plt.show()
             if dim == None:
                 print('Data is scaled with {} scaler and Smoted. Model is optimized'.format(scaler))
             if dim != None:
@@ -978,7 +1010,8 @@ class Wrappers:
         clf5 = ml.Optimize(vanilla, grid, X5, y4)
         score5 = ev.ACE(clf5, metric, Xv5, yval)
         if quiet == False:
-            print(plot_confusion_matrix(clf5, Xv5, yval))
+            plot_confusion_matrix(clf5, Xv5, yval)
+            plt.show()
             if dim == None:
                 print('Data is scaled with {} scaler and Smoted. Model is optimized'.format(scaler))
             if dim != None:
@@ -988,10 +1021,17 @@ class Wrappers:
             auc = ev.AUC(clf5, Xv5, yval)
             print('{} is {} and AUC is {}'.format(metric, score5, auc))
         results[score5] = clf5, X5, y4, scaler, dim
+        if quiet == False:
+            x = ['vanilla', 'optimized', 'scaled', 'smoted', 'engineered']
+            yy = list(results.keys())
+            sns.barplot(x, yy)
+            plt.show()
         return results[max(results)]
 
     def RegLoop(self, vanilla, grid, X, Xval, y, yval, quiet=True):
         '''finds the best regressor and associated dataset'''
+        if quiet == False:
+            print(vanilla)
         ml = MachineLearning()
         dh = DataHelper()
         wr = Wrappers()
@@ -1031,63 +1071,68 @@ class Wrappers:
                 print('Data is scaled with {} scaler, Model is optimized'.format(scaler))
             if dim != None:
                 print('Data is reduced to {} features with PCA, Model is optimized'.format(dim))
-            RMSE, Accuracy = ev.EvaluateRegressor(reg3, X3, Xv3, y, yval)
+            RMSE, Accuracy = ev.EvaluateRegressor(reg3, X3, Xv3, y, yval)[1:]
             print('RMSE = {}, Accuracy = {}%'.format(RMSE, Accuracy))
         results[score3] = reg3, X3, y, scaler, dim
         X4, Xv4 = wr.FeatureEngineering(X3, y, Xv3, yval, reg3, 'regression', 'accuracy')
         reg4 = ml.Optimize(vanilla, grid, X4, y)
-        #reg4.fit(X4, y)
         score4 = reg4.score(Xv4, yval)
+        if quiet == False:
+            if dim == None:
+                print('Data is scaled with {} scaler and high vif features are removed. Model is optimized'.format(scaler))
+            if dim != None:
+                print('Data is reduced to {} features with PCA and Smoted. Model is optimized'.format(dim))
+            feats = list(X4.columns)
+            print('Using {} as features'.format(feats))
+            RMSE, Accuracy = ev.EvaluateRegressor(reg4, X4, Xv4, y, yval)[1:]
+            print('RMSE = {}, Accuracy = {}%'.format(RMSE, Accuracy))
         results[score4] = reg4, X4, y, scaler, dim
         X5 = dh.AMF(X4)
         Xv5 = Xv4[list(X5.columns)]
         reg5 = ml.Optimize(vanilla, grid, X5, y)
-        #reg5.fit(X5, y)
         score5 = reg5.score(Xv5, yval)
+        if quiet == False:
+            if dim == None:
+                print('Data is scaled with {} scaler and Smoted. Model is optimized'.format(scaler))
+            if dim != None:
+                print('Data is reduced to {} features with PCA and Smoted. Model is optimized'.format(dim))
+            feats = list(X5.columns)
+            print('Using {} as features'.format(feats))
+            RMSE, Accuracy = ev.EvaluateRegressor(reg5, X5, Xv5, y, yval)[1:]
+            print('RMSE = {}, Accuracy = {}%'.format(RMSE, Accuracy))
         results[score5] = reg5, X5, y, scaler, dim
         return results[max(results)]
 
-    def WrapML(self, df, target_str, task, fn=False):
+    def WrapML(self, df, target_str, task, fn=False, quiet=True):
         '''Modeling process for traditional ml on tabular data'''
         wr = Wrappers()
         vanilla, grid, X, Xval, y, yval = wr.Vanilla(df, target_str, task)
         if task == 'classification':
-            model, X, y, scaler, dim = wr.ClfLoop(vanilla, grid, X, Xval, y, yval, fn)
+            model, X, y, scaler, dim = wr.ClfLoop(vanilla, grid, X, Xval, y, yval, fn, quiet)
         if task == 'regression':
-            model, X, y, scaler, dim = wr.RegLoop(vanilla, grid, X, Xval, y, yval)
+            if fn == True:
+                print('fn only affects output for classification tasks')
+            model, X, y, scaler, dim = wr.RegLoop(vanilla, grid, X, Xval, y, yval, quiet)
         df2 = X
         df2[target_str] = y 
         return model, df2, scaler, dim
 
-    def Mantain(self, model, base_data, new_data, scaler, dim, task, target_str): #need a train test split to prevent overfitting in the future
-        '''allows for adding new data and model retraining'''
-        al = Algorithms()
-        dh = DataHelper()
+    def Mantain(self, base_data, new_data, target_str, task, fn=False, quiet=True): #need a train test split to prevent overfitting in the future
+        wr = Wrappers()
         if type(new_data) == dict:
             add = pd.DataFrame(new_data)
         else:
             try:
                 add = new_data
             except:
-                print('please pass a dictionary or dataframe for "new_data"')
-        df = pd.concat([base_data, add]).reset_index()
-        X = df.drop([target_str])
-        y = df[target_str]
-        if task == 'classification':
-            if al.Imbalanced(y) == True:
-                X2, y2 = dh.SmoteIt(X, y)
-            else:
-                X2, y2 = X, y
-        else:
-            X2, y2 = X, y
-        if scaler != None:
-            X3 = dh.ScaleData(scaler, X2, dim=dim)
-        else:
-            X3 = X2
-        model.fit(X2, y2) 
-        df2 = X2
-        df2[target_str] = y2
-        return model, df2
+                print('please pass a dictionary or dataframe for "new data"')
+        df2 = pd.concat([base_data, add]).reset_index()
+        model, df3, scaler, dim = wr.WrapML(df2, target_str, task, fn=fn, quiet=quiet)
+        if quiet == False:
+            print(scaler)
+            if dim != None:
+                print('We have reduced the dataset to {} features with PCA.'.format(dim))
+        return df2, df3, model
 
 vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv').drop(['Unnamed: 0'], axis='columns')
 
@@ -1096,9 +1141,6 @@ vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.c
 #vt.columns = list(load_boston()['feature_names'])
 #vt['price'] = load_boston()['target']
 
-print(Wrappers().WrapML(vt, 'churn', 'classification')[:2])
-#test = DataHelper().HoldOut(vt)[1]
-#Xval = test[list(df.columns)].drop(['price'], axis='columns')
-#yval = test['price']
-#X = df.drop(['price'], axis='columns')
-#y = df['price']
+X = vt.drop(['churn'], axis='columns')
+y = vt['churn']
+print(Evaluater().InspectTree(RandomForestClassifier(), X, y, forest=True))
