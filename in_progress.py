@@ -12,7 +12,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.metrics import confusion_matrix, roc_curve, auc, plot_confusion_matrix
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelBinarizer, OneHotEncoder
 from sklearn.pipeline import Pipeline
-from imblearn.over_sampling import SMOTE
+from imblearn.over_sampling import SMOTE, SMOTENC
 from xgboost import XGBClassifier, XGBRegressor
 from matplotlib import pyplot as plt
 from sklearn.feature_selection import SelectKBest
@@ -537,9 +537,14 @@ class DataHelper:
               index=X.columns)
         return vif
     
-    def SmoteIt(self, X, y):
+    def SmoteIt(self, X, y, bool_arr=None):
         '''uses Smote Sampling to address Class Imbalance'''
-        return SMOTE().fit_resample(X, y)
+        if type(bool_arr) == None:
+            return SMOTE().fit_resample(X, y)
+        if len(bool_arr) == 0:
+            return SMOTE().fit_resample(X, y)
+        else:
+            return SMOTENC(categorical_features=bool_arr).fit_resample(X, y)
     
     def MakeDirs(self, train_dir, test_dir, classes, data_type='images'):
         '''makes filepaths, intended for loading in image data'''
@@ -557,6 +562,7 @@ class DataHelper:
         feats = list(X.columns)
         boolys = []
         for feat in feats:
+            print(test)
             if list(np.unique(X[feat])) == [0, 1]:
                 boolys.append(True)
             if list(np.unique(X[feat])) == [0.0, 1.0]:
@@ -566,7 +572,7 @@ class DataHelper:
         if len(boolys) == 0:
             return None 
         else:
-            return np.array(boolys)
+            return  len(feats) #np.array(boolys)
         
                 
 class Evaluater:
@@ -902,12 +908,12 @@ class Wrappers:
             'n_estimators': estimators}
         return vanilla, grid, X, Xval, y, yval
 
-    def SmoteStack(self, X, y, Xval, yval, model, parameters, metric, alone=False):
+    def SmoteStack(self, X, y, Xval, yval, model, parameters, metric, alone=False, bool_arr=None):
         '''Smotes a dataset and evaluates model on it'''
         dh = DataHelper()
         ml = MachineLearning()
         ev = Evaluater()
-        X2, y2 = dh.SmoteIt(X, y)
+        X2, y2 = dh.SmoteIt(X, y, bool_arr=bool_arr)
         clf = ml.Optimize(model, parameters, X2, y2)
         if alone == True:
             clf.fit(X2, y2)
@@ -945,6 +951,7 @@ class Wrappers:
         dh = DataHelper()
         wr = Wrappers()
         results = {}
+        n = len(np.unique(y))
         metric = al.GetMetric(y, fn)
         clf1 = vanilla
         clf1.fit(X, y)
@@ -953,8 +960,11 @@ class Wrappers:
             plot_confusion_matrix(clf1, Xval, yval);
             plt.show()
             print('Raw Vanilla')
-            auc = ev.AUC(clf1, Xval, yval)
-            print('{} is {} and AUC is {}'.format(metric, score1, auc)) #check to see if AUC works for multiclass
+            if n == 2:
+                a = ev.AUC(clf1, Xval, yval)
+                print('{} is {} and AUC is {}'.format(metric, score1, auc)) #check to see if AUC works for multiclass
+            else: 
+                print('{} is {}'.format(metric, score1))
         results[score1] = clf1, X, y, None, None
         clf2 = ml.Optimize(vanilla, grid, X, y, metric=metric)
         score2 = ev.ACE(clf2, metric, Xval, yval)
@@ -962,8 +972,11 @@ class Wrappers:
             plot_confusion_matrix(clf2, Xval, yval)
             plt.show()
             print('Raw Data, Optimized Model')
-            auc = ev.AUC(clf2, Xval, yval)
-            print('{} is {} and AUC is {}'.format(metric, score2, auc))
+            if n == 2:
+                a = ev.AUC(clf2, Xval, yval)
+                print('{} is {} and AUC is {}'.format(metric, score2, auc)) #check to see if AUC works for multiclass
+            else: 
+                print('{} is {}'.format(metric, score2))
         results[score2] = clf2, X, y, None, None
         scaler = al.PickScaler(X, y, clf2)
         if scaler == 'pca':
@@ -985,12 +998,16 @@ class Wrappers:
                 print('Data is scaled with {} scaler, Model is optimized'.format(scaler))
             if dim != None:
                 print('Data is reduced to {} features with PCA, Model is optimized'.format(dim))
-            auc = ev.AUC(clf3, Xv3, yval)
-            print('{} is {} and AUC is {}'.format(metric, score3, auc))
+            if n == 2:
+                a = ev.AUC(clf3, Xv3, yval)
+                print('{} is {} and AUC is {}'.format(metric, score3, auc)) #check to see if AUC works for multiclass
+            else: 
+                print('{} is {}'.format(metric, score3))
         results[score3] = clf3, X3, y, scaler, dim
         if metric != 'accuracy':
             print('Smoting!!')
-            score4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla, grid, metric)
+            bool_arr = dh.GetCats(X)
+            score4, clf4, X4, y4 = wr.SmoteStack(X3, y, Xv3, yval, vanilla, grid, metric, bool_arr=bool_arr)
         else:
             X4 = X3
             y4 = y
@@ -1003,8 +1020,11 @@ class Wrappers:
                 print('Data is scaled with {} scaler and Smoted. Model is optimized'.format(scaler))
             if dim != None:
                 print('Data is reduced to {} features with PCA and Smoted. Model is optimized'.format(dim))
-            auc = ev.AUC(clf4, Xv3, yval)
-            print('{} is {} and AUC is {}'.format(metric, score4, auc))
+            if n == 2:
+                a = ev.AUC(clf4, Xv3, yval)
+                print('{} is {} and AUC is {}'.format(metric, score4, auc)) #check to see if AUC works for multiclass
+            else: 
+                print('{} is {}'.format(metric, score4))
         results[score4] = clf4, X4, y4, scaler, dim
         X5, Xv5 = wr.FeatureEngineering(X4, y4, Xv3, yval, clf4, 'classification', metric)
         clf5 = ml.Optimize(vanilla, grid, X5, y4)
@@ -1018,8 +1038,11 @@ class Wrappers:
                 print('Data is reduced to {} features with PCA and Smoted. Model is optimized'.format(dim))
             feats = list(X5.columns)
             print('Using {} as features'.format(feats))
-            auc = ev.AUC(clf5, Xv5, yval)
-            print('{} is {} and AUC is {}'.format(metric, score5, auc))
+            if n == 2:
+                a = ev.AUC(clf5, Xv5, yval)
+                print('{} is {} and AUC is {}'.format(metric, score5, auc)) #check to see if AUC works for multiclass
+            else: 
+                print('{} is {}'.format(metric, score5))
         results[score5] = clf5, X5, y4, scaler, dim
         if quiet == False:
             x = ['vanilla', 'optimized', 'scaled', 'smoted', 'engineered']
@@ -1134,6 +1157,7 @@ class Wrappers:
                 print('We have reduced the dataset to {} features with PCA.'.format(dim))
         return df2, df3, model
 
+
 vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv').drop(['Unnamed: 0'], axis='columns')
 
 #from sklearn.datasets import load_boston
@@ -1143,4 +1167,6 @@ vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.c
 
 X = vt.drop(['churn'], axis='columns')
 y = vt['churn']
-print(Evaluater().InspectTree(RandomForestClassifier(), X, y, forest=True))
+bool_arr = DataHelper().GetCats(X)
+#print(DataHelper().SmoteIt(X, y, bool_arr=bool_arr))
+print(bool_arr)
