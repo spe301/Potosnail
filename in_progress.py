@@ -544,6 +544,7 @@ class DataHelper:
         if len(bool_arr) == 0:
             return SMOTE().fit_resample(X, y)
         else:
+            print('Using Smotenc')
             return SMOTENC(categorical_features=bool_arr).fit_resample(X, y)
     
     def MakeDirs(self, train_dir, test_dir, classes, data_type='images'):
@@ -562,17 +563,8 @@ class DataHelper:
         feats = list(X.columns)
         boolys = []
         for feat in feats:
-            print(test)
-            if list(np.unique(X[feat])) == [0, 1]:
-                boolys.append(True)
-            if list(np.unique(X[feat])) == [0.0, 1.0]:
-                boolys.append(True)
-            else:
-                boolys.append(False)
-        if len(boolys) == 0:
-            return None 
-        else:
-            return  len(feats) #np.array(boolys)
+            boolys.append(list(np.unique(X[feat])) == [0.0, 1.0])
+        return np.array(boolys)
         
                 
 class Evaluater:
@@ -657,18 +649,19 @@ class Evaluater:
         score = model.score(Xval, yval)*100
         return results, RMSE, round(score, 2)
     
-    def BinaryCBA(self, model, X, y, rate, total_cost, discount):
+    def BinaryCBA(self, model, X, y, rate, total_cost, discount, quiet=True):
         '''calculates the potential revenue with and of using the model to make decisions'''
         cm = confusion_matrix(y, model.predict(X))
-        tn = cm[0][0] * rate
-        fp = cm[0][1] * (rate-discount)
-        fn = cm[1][0] * (total_cost) * -1
-        tp = cm[1][1] * (rate-discount)
-        ml = tn + fp + fn + tp
-        n = (cm[0][0] + cm[0][1])*rate
-        p = (cm[1][0] + cm[1][1])*total_cost*-1
-        no = n + p
-        return 'With this model: ${}, without ml: ${}'.format(ml, no)
+        tn = cm[0][0]
+        fp = cm[0][1]
+        fn = cm[1][0]
+        tp = cm[1][1]
+        cost = (fp*discount)+(fn*total_cost)
+        benefit = tp*((rate+total_cost)-discount)
+        if quiet == False:
+            return 'the cost is ${} and the benefit is ${}'.format(cost, benefit)
+        else:
+            return cost, benefit
         
     def DoCohen(self, group1, group2):
         '''calculates Cohen's D between 2 population samples'''
@@ -824,6 +817,24 @@ class Algorithms:
         else:
             return False
         
+    def ScoreClf(self, model, metric, X, y):
+        ev = Evaluater()
+        if metric == 'accuracy':
+            score = model.score(X, y)
+        else:
+            cm = confusion_matrix(y, model.predict(X))
+            if metric == 'recall':
+                s1 = cm[1][1] / (cm[1][1]+cm[1][0]) 
+                s2 = cm[0][0] / (cm[0][0]+cm[0][1]) 
+            if metric == 'precision':
+                s1 = cm[0][0] / (cm[0][0]+cm[0][1])
+                s2 = cm[1][1] / (cm[1][1]+cm[1][0])
+            if s2 > 0.52:
+                score = s1
+            else:
+                score = (s1*0.5) + (ev.AUC(model, X, y)*0.5)
+        return score
+        
 
 class Wrappers: 
 
@@ -912,12 +923,12 @@ class Wrappers:
         '''Smotes a dataset and evaluates model on it'''
         dh = DataHelper()
         ml = MachineLearning()
-        ev = Evaluater()
+        al = Algorithms()
         X2, y2 = dh.SmoteIt(X, y, bool_arr=bool_arr)
         clf = ml.Optimize(model, parameters, X2, y2)
         if alone == True:
             clf.fit(X2, y2)
-        score = ev.ACE(clf, metric, Xval, yval)
+        score = al.ScoreClf(clf, metric, Xval, yval)
         return score, clf, X2, y2
 
     def FeatureEngineering(self, X, y, Xval, yval, model, task, metric):
@@ -955,28 +966,28 @@ class Wrappers:
         metric = al.GetMetric(y, fn)
         clf1 = vanilla
         clf1.fit(X, y)
-        score1 = ev.ACE(clf1, metric, Xval, yval)
+        score1 = al.ScoreClf(clf1, metric, Xval, yval)
         if quiet == False:
-            plot_confusion_matrix(clf1, Xval, yval);
+            plot_confusion_matrix(clf1, Xval, yval, cmap='Blues');
             plt.show()
             print('Raw Vanilla')
             if n == 2:
                 a = ev.AUC(clf1, Xval, yval)
-                print('{} is {} and AUC is {}'.format(metric, score1, auc)) #check to see if AUC works for multiclass
+                print('General score is {} and AUC is {}'.format(score1, a)) #check to see if AUC works for multiclass
             else: 
-                print('{} is {}'.format(metric, score1))
+                print('General score is {}'.format(score1))
         results[score1] = clf1, X, y, None, None
         clf2 = ml.Optimize(vanilla, grid, X, y, metric=metric)
-        score2 = ev.ACE(clf2, metric, Xval, yval)
+        score2 = al.ScoreClf(clf2, metric, Xval, yval)
         if quiet == False:
-            plot_confusion_matrix(clf2, Xval, yval)
+            plot_confusion_matrix(clf2, Xval, yval, cmap='Blues')
             plt.show()
             print('Raw Data, Optimized Model')
             if n == 2:
                 a = ev.AUC(clf2, Xval, yval)
-                print('{} is {} and AUC is {}'.format(metric, score2, auc)) #check to see if AUC works for multiclass
+                print('General score is {} and AUC is {}'.format(score2, a)) #check to see if AUC works for multiclass
             else: 
-                print('{} is {}'.format(metric, score2))
+                print('General score is {}'.format(score2))
         results[score2] = clf2, X, y, None, None
         scaler = al.PickScaler(X, y, clf2)
         if scaler == 'pca':
@@ -990,9 +1001,9 @@ class Wrappers:
             Xv3 = dh.ScaleData(scaler, Xval)
             Xv3.columns = list(X.columns)
         clf3 = ml.Optimize(vanilla, grid, X3, y, metric=metric)
-        score3 = ev.ACE(clf3, metric, Xv3, yval) 
+        score3 = al.ScoreClf(clf3, metric, Xv3, yval) 
         if quiet == False:
-            plot_confusion_matrix(clf3, Xv3, yval)
+            plot_confusion_matrix(clf3, Xv3, yval, cmap='Blues')
             plt.show()
             if dim == None:
                 print('Data is scaled with {} scaler, Model is optimized'.format(scaler))
@@ -1000,9 +1011,9 @@ class Wrappers:
                 print('Data is reduced to {} features with PCA, Model is optimized'.format(dim))
             if n == 2:
                 a = ev.AUC(clf3, Xv3, yval)
-                print('{} is {} and AUC is {}'.format(metric, score3, auc)) #check to see if AUC works for multiclass
+                print('General score is {} and AUC is {}'.format(score3, a)) #check to see if AUC works for multiclass
             else: 
-                print('{} is {}'.format(metric, score3))
+                print('General score is {}'.format(score3))
         results[score3] = clf3, X3, y, scaler, dim
         if metric != 'accuracy':
             print('Smoting!!')
@@ -1014,7 +1025,7 @@ class Wrappers:
             score4 = score3
             clf4 = clf3
         if quiet == False:
-            plot_confusion_matrix(clf4, Xv3, yval)
+            plot_confusion_matrix(clf4, Xv3, yval, cmap='Blues')
             plt.show()
             if dim == None:
                 print('Data is scaled with {} scaler and Smoted. Model is optimized'.format(scaler))
@@ -1022,15 +1033,15 @@ class Wrappers:
                 print('Data is reduced to {} features with PCA and Smoted. Model is optimized'.format(dim))
             if n == 2:
                 a = ev.AUC(clf4, Xv3, yval)
-                print('{} is {} and AUC is {}'.format(metric, score4, auc)) #check to see if AUC works for multiclass
+                print('General score is {} and AUC is {}'.format(score4, a)) #check to see if AUC works for multiclass
             else: 
-                print('{} is {}'.format(metric, score4))
+                print('General score is {}'.format(score4))
         results[score4] = clf4, X4, y4, scaler, dim
         X5, Xv5 = wr.FeatureEngineering(X4, y4, Xv3, yval, clf4, 'classification', metric)
         clf5 = ml.Optimize(vanilla, grid, X5, y4)
-        score5 = ev.ACE(clf5, metric, Xv5, yval)
+        score5 = al.ScoreClf(clf5, metric, Xv5, yval)
         if quiet == False:
-            plot_confusion_matrix(clf5, Xv5, yval)
+            plot_confusion_matrix(clf5, Xv5, yval, cmap='Blues')
             plt.show()
             if dim == None:
                 print('Data is scaled with {} scaler and Smoted. Model is optimized'.format(scaler))
@@ -1040,15 +1051,18 @@ class Wrappers:
             print('Using {} as features'.format(feats))
             if n == 2:
                 a = ev.AUC(clf5, Xv5, yval)
-                print('{} is {} and AUC is {}'.format(metric, score5, auc)) #check to see if AUC works for multiclass
+                print('General score is {} and AUC is {}'.format(score5, a)) #check to see if AUC works for multiclass
             else: 
-                print('{} is {}'.format(metric, score5))
+                print('General score is {}'.format(score5))
         results[score5] = clf5, X5, y4, scaler, dim
         if quiet == False:
             x = ['vanilla', 'optimized', 'scaled', 'smoted', 'engineered']
             yy = list(results.keys())
-            sns.barplot(x, yy)
-            plt.show()
+            try:
+                sns.barplot(x, yy)
+                plt.show()
+            except:
+                pass
         return results[max(results)]
 
     def RegLoop(self, vanilla, grid, X, Xval, y, yval, quiet=True):
@@ -1158,15 +1172,4 @@ class Wrappers:
         return df2, df3, model
 
 
-vt = pd.read_csv(r'C:\Users\aacjp\OneDrive\Desktop\data\tables\ChurnData_ForML.csv').drop(['Unnamed: 0'], axis='columns')
-
-#from sklearn.datasets import load_boston
-#vt = pd.DataFrame(load_boston()['data'])
-#vt.columns = list(load_boston()['feature_names'])
-#vt['price'] = load_boston()['target']
-
-X = vt.drop(['churn'], axis='columns')
-y = vt['churn']
-bool_arr = DataHelper().GetCats(X)
-#print(DataHelper().SmoteIt(X, y, bool_arr=bool_arr))
-print(bool_arr)
+#DeepLearning().ClassifyText(r'C:\Users\aacjp\Wikipedia-Capstone\model2.h5', text_str, pad)
