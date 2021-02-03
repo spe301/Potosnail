@@ -115,7 +115,7 @@ class MachineLearning:
         return results
 
     def AMC(self, X, y, task):
-        '''Automated Model Comparasion'''
+        '''Automated Model Comparison'''
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
         n = len(np.unique(y))
         if task == 'classification':
