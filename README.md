@@ -9,7 +9,7 @@ contact: aacjpw@gmail.com
 
 # Installation and import 
 
-pip install Potosnail==0.0.7
+pip install Potosnail==0.0.9
 
 import potosnail
 
