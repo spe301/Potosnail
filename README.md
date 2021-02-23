@@ -44,9 +44,6 @@ I will list each class and the functions within each class.
      output: The best sklearn model suitable for the task
     
 2. DeepLearning
-  * Powers
-    input: n(any positive integer)
-    output: how many times n is divisible by 2
   * DeepTabularRegression
     input: nodes(n nodes you want in the 1st layer), activation, regularizer, stacking(make first 2 layers the same), dropout (true or false),
     nlayers, closer(extra layer before output layer), loss, optimizer, y_col(same as target_str)
@@ -56,7 +53,7 @@ I will list each class and the functions within each class.
     nlayers, closer(extra layer before output layer), loss, optimizer
     output: keras model
   * PipeIt
-    input: scaler, model, X, y
+    input: scaler, model (keras), X, y
     output: training and testing score of the given model fitted on the scaled data (X)
   * FastNN
    input: task, loss, output_dim(default=None), nodes(default=64), activation(default='relu'), regularizer(default=None), stacking(default=False), dropout(default=False),          nlayers(default=4), closer(default=False), optimizer(default='adam')
@@ -178,4 +175,69 @@ I will list each class and the functions within each class.
   * ACE
     input: fitted_model, metric (accuracy, recall, or precision), Xval, yval
     output: the model's score of the given metric
-   * PipeIt: scaler, model, X, y, quiet(default=False)
+  * PipeIt
+    input: scaler, model  (sklearn), X, y, quiet(default=False)
+    output: training and testing score of the given model fitted on the scaled data (X)
+  * InspectTree
+    input: tree (sklearn tree or enseble), X, y
+    output: a plotted tree if a tree, a feature importance graph if an ensemble
+   
+5. Algorithms
+ * Powers
+   input: n (int)
+   output: number of times n is divisible by 2
+ * Neighbors
+   input: X, y, task (classification and regression)
+   output: list of n neighbors to test in a gridsearch
+  * Estimators
+    input: X, default (int)
+    output: list of n estimators to test in a gridsearch
+  * GetMetric
+    input: y, fn (bool, if True it means that false positives are worse than false negatives)
+    output: recall or precision (str)
+  * PickScaler
+    input: X, y, model
+    output: what type of scaler is reccomended t0 use (str)
+  * ReduceTo
+    input: X
+    output: n columns divided by 5 (int), can be used for dimensionality reduction
+  * ToTry
+    input: X
+    output: a list of the sumber of features to try in a gridsearch
+  * Imbalanced
+    input: y
+    output: a boolean indicating whether or not your dataset is imbalanced 
+  * ScoreClf
+    input: model (sklearn classifier), metric, X, y
+    output: the model's score in that given metric
+  
+6. Wrappers
+* TCP
+  input: X(list or series of text, ie. Tweets), y(list or series of numerical lables) 
+  output: tokenized text, binarized lables, and vocab size
+ * Vanilla
+   input: df, target_str (name of the y col), task (classification or regression):
+   output: the best baseline sklearn model, a suggested gridsearch, and a holdout dataset is created
+ * SmoteStack
+   input: X, y, Xval, yval, model, parameters(parameter gird), metric, bool_arr(optional)
+   output: validation score of the tuned model after smoting
+ * FeatureEngineering
+   input: X, y, Xval, yval, model, task, metric
+   output: the dataset with only the better features
+ * ClfLoop
+   input: vanilla (baseline sklearn classifier), grid, X, Xval, y, yval, fn, quiet (defalut=True, if false the entire process is displayed)
+   output: the best tuned model
+ * RegLoop
+   input: vanilla (baseline sklearn regressor), grid, X, Xval, y, yval, quiet (default=True)
+   output: the best tuned model
+ * WrapML
+   input: df, target_str(name of y col), task, fn(default=False), quiet(default=True)
+   output: the best tuned model, the best version of the dataset, and the scaler used 
+  * Mantain
+    input: base_data, new_data, target_str, task, fn(default=False), quiet(default=True)
+    output: updated dataset and a tuned model
+    
+7. Stats
+ * PDF
+   input: list of datapoints (int or float), bins(default=100)
+   output: a distribution in the form of a line graph
