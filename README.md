@@ -36,6 +36,12 @@ I will list each class and the functions within each class.
   * ClusterIt
     input: data(pandas dataframe), clusters(n categories you want the data segmented into)
     output: a visual representation of clustering the data with K-means
+  * ClusterIt2D
+    input: data, clusters (number of clusters)
+    output: your dataset reduced to 2 features for an easier visuals
+   * AMC
+     input: X, y, task (classification or regression)
+     output: The best sklearn model suitable for the task
     
 2. DeepLearning
   * Powers
@@ -49,6 +55,9 @@ I will list each class and the functions within each class.
     input: output_dim, nodes(n nodes you want in the 1st layer), activation, regularizer, stacking(make first 2 layers the same), dropout,
     nlayers, closer(extra layer before output layer), loss, optimizer
     output: keras model
+  * PipeIt
+    input: scaler, model, X, y
+    output: training and testing score of the given model fitted on the scaled data (X)
   * FastNN
    input: task, loss, output_dim(default=None), nodes(default=64), activation(default='relu'), regularizer(default=None), stacking(default=False), dropout(default=False),          nlayers(default=4), closer(default=False), optimizer(default='adam')
    output: keras model
@@ -89,6 +98,9 @@ I will list each class and the functions within each class.
     input: directories(directories to the file of training and testing for each class, can be made with DataHelper().MakeDirs()), classes, target_size(default=(150, 150))
     output: image tensors and OneHotEncoded labels
 3. DataHelper
+  * AMF
+  input: X
+  output: the dataset with all features with VIF of 5.5 and up filtered out
   * HoldOut
     input: data(any dataframe, array, or list)
     output: train data and test data
@@ -102,11 +114,30 @@ I will list each class and the functions within each class.
    input: X(dataframe with y dropped)
    output: Vif(variance inflation-factor) scores for all features
   * SmoteIt
-    input: X(dataframe with y dropped), y(dataframe[ycol])
-    output: X without class imbalance(ie. if only 100 of 1,000 patients in a dataset have cancer, SmoteIt will return the data + 900 synthetic cancer patient datapoints)
+    input: X(dataframe with y dropped), y(dataframe[ycol]), bool_arr (optional)
+    output: X without class imbalance(ie. if only 100 of 1,000 patients in a dataset have cancer, SmoteIt will return the data + 900 synthetic cancer patient datapoints). if bool_arr is not empty, the function will run SMOTENC.
   * MakeDirs
     input: train_dir, test_dir, classes
     output: directories(directories to the file of training and testing for each class)
+  * Getcats
+    input: X
+    output: list of all categorical features
+   * Scrape
+    input: url
+    output: the main bodies of text in a given website, assuming the request is accepted and the site allows scraping
+   * GetVocab
+     input: df, data_str (name of the column that contains the text)
+     output: number of unique words in the text corpus
+    * Binarize
+      input: df, columns_list (the columns with non-numerical binary values, ie. gender)
+      output: new dataframe with all non-numerical binary values
+    * OHE
+      input: series (a column of categorical string values)
+      output: a one hot encoded dataframe
+    * Stars2Binary
+      input: series (list or array of ratings, ie, scale of 1-5 or 1-10)
+      output: a list 1's and 0's. 1 being a higher rating and one being lower. this turns rating prediction into a classification problem rather than a regression.
+    
 4. Evaluater
   * ScoreModel
     input: model(fitted sklearn model), X, y
@@ -144,3 +175,7 @@ I will list each class and the functions within each class.
   * AUC
     input: model(sklearn classifier), Xval, yval
     output: AUC score
+  * ACE
+    input: fitted_model, metric (accuracy, recall, or precision), Xval, yval
+    output: the model's score of the given metric
+   * PipeIt: scaler, model, X, y, quiet(default=False)
