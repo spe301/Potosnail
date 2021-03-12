@@ -9,7 +9,7 @@ contact: aacjpw@gmail.com
 
 # Installation and import 
 
-the latest version can be installed via pip install Potosnail==0.2.1
+the latest version can be installed via pip install Potosnail==0.2.4
 
 # Tutorials and Case Studies
 Check out the notebooks in the tutorials folder to see some implementation. If you want to see more real-world use cases for potosnail, chech out the Case_Studies folder
